@@ -6,3 +6,5 @@
 - [x] Add friendly text and visual elements to make the app engaging
 - [x] Test the app locally to ensure functionality
 - [x] Finalize and document any additional features if needed
+- [ ] Add animated cutesy chibi characters that roam around the interface
+- [ ] Update UI with floating animations and character interactions
