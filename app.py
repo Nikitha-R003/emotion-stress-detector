@@ -10,6 +10,12 @@ import time
 import json
 from textblob import TextBlob
 import nltk
+import streamlit.components.v1 as components
+from database import db_manager
+
+# Set page config at the very beginning
+st.set_page_config(page_title="AI Mental Wellness Companion", page_icon="🧠", layout="wide")
+
 nltk.download('punkt', quiet=True)
 
 # Load the emotion detection model
@@ -236,403 +242,570 @@ st.markdown("""
 for i in range(5):
     st.markdown(f'<div class="character-container"><span class="floating-char">{floating_characters()}</span></div>', unsafe_allow_html=True)
 
-# Initialize session state for data persistence
+# JavaScript component for localStorage persistence
+def local_storage_component(key, data=None):
+    """Component to save/load data from browser localStorage"""
+    if data is not None:
+        # Save data
+        data_json = json.dumps(data, default=str)
+        js_code = f"""
+        <script>
+        localStorage.setItem('{key}', '{data_json}');
+        </script>
+        """
+    else:
+        # Load data
+        js_code = f"""
+        <script>
+        const data = localStorage.getItem('{key}');
+        if (data) {{
+            console.log('Loaded {key} from localStorage');
+        }}
+        </script>
+        """
+
+    components.html(js_code, height=0, width=0)
+
+def load_from_local_storage(key):
+    """Load data from localStorage via JavaScript"""
+    # This is a simplified approach - in practice, we'd need bidirectional communication
+    # For now, we'll use a placeholder and implement proper persistence
+    return None
+
+def save_to_local_storage(key, data):
+    """Save data to localStorage"""
+    local_storage_component(key, data)
+
+# Initialize session state for authentication and data persistence
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
+if 'username' not in st.session_state:
+    st.session_state.username = None
 if 'mood_history' not in st.session_state:
     st.session_state.mood_history = []
 if 'journal_entries' not in st.session_state:
     st.session_state.journal_entries = []
 
-# Streamlit UI with tabs
-st.set_page_config(page_title="AI Mental Wellness Companion", page_icon="🧠", layout="wide")
+# Authentication check
+def check_authentication():
+    """Check if user is logged in"""
+    return st.session_state.user_id is not None
 
-# Sidebar navigation
-st.sidebar.title("🧠 Wellness Hub")
-page = st.sidebar.radio("Navigate", ["Home", "Mood Analysis", "Journal", "Progress Dashboard", "Wellness Tools"])
-
-# Home page
-if page == "Home":
+def login_page():
+    """Display login/signup page"""
     st.title("🧠 AI Mental Wellness Companion")
-    st.markdown("### Your Personal AI-Powered Mental Health Companion")
+    st.markdown("### Welcome! Please login or create an account")
 
-    col1, col2 = st.columns([2, 1])
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-    with col1:
-        st.markdown("""
-        Welcome to your comprehensive mental wellness companion! This AI-powered app provides:
+    with tab1:
+        st.markdown("### Login to your account")
+        login_username = st.text_input("Username", key="login_username")
+        login_password = st.text_input("Password", type="password", key="login_password")
 
-        🎯 **Multi-Modal Analysis**: Emotion detection, sentiment analysis, and stress assessment
-        📊 **Progress Tracking**: Visual charts of your mood patterns over time
-        📝 **Therapeutic Journaling**: AI insights on your writing patterns
-        🛠️ **Wellness Tools**: Personalized coping strategies and mindfulness exercises
-        🎨 **Cheerful Interface**: Floating characters and friendly interactions
+        if st.button("Login", type="primary"):
+            if login_username and login_password:
+                user_id = db_manager.authenticate_user(login_username, login_password)
+                if user_id:
+                    st.session_state.user_id = user_id
+                    st.session_state.username = login_username
+                    # Load user data from database
+                    st.session_state.mood_history = db_manager.get_mood_history(user_id)
+                    st.session_state.journal_entries = db_manager.get_journal_entries(user_id)
+                    st.success("✅ Login successful! Welcome back!")
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid username or password")
+            else:
+                st.error("Please enter both username and password")
 
-        **Getting Started:**
-        1. Go to "Mood Analysis" to analyze your current emotional state
-        2. Use "Journal" to write and get AI-powered insights
-        3. Check "Progress Dashboard" for trends and patterns
-        4. Explore "Wellness Tools" for coping strategies
-        """)
+    with tab2:
+        st.markdown("### Create a new account")
+        signup_username = st.text_input("Choose a username", key="signup_username")
+        signup_password = st.text_input("Choose a password", type="password", key="signup_password")
+        signup_confirm = st.text_input("Confirm password", type="password", key="signup_confirm")
 
-    with col2:
-        st.markdown("### Quick Stats")
+        if st.button("Create Account"):
+            if signup_username and signup_password and signup_confirm:
+                if signup_password != signup_confirm:
+                    st.error("Passwords don't match")
+                elif len(signup_username) < 3:
+                    st.error("Username must be at least 3 characters long")
+                elif len(signup_password) < 6:
+                    st.error("Password must be at least 6 characters long")
+                elif db_manager.user_exists(signup_username):
+                    st.error("Username already exists. Please choose a different one.")
+                else:
+                    if db_manager.create_user(signup_username, signup_password):
+                        st.success("✅ Account created successfully! Please login with your credentials.")
+                    else:
+                        st.error("❌ Failed to create account. Please try again.")
+            else:
+                st.error("Please fill in all fields")
+
+# Main app logic
+if not check_authentication():
+    login_page()
+else:
+    # Sidebar with logout option
+    st.sidebar.title("🧠 Wellness Hub")
+    st.sidebar.markdown(f"**Welcome, {st.session_state.username}!**")
+
+    if st.sidebar.button("Logout"):
+        # Save current data to database before logout
         if st.session_state.mood_history:
-            recent_emotions = [entry['emotion'] for entry in st.session_state.mood_history[-7:]]
-            most_common = max(set(recent_emotions), key=recent_emotions.count) if recent_emotions else "None"
-            st.metric("Most Common Emotion (Last 7)", most_common.capitalize())
-            st.metric("Total Entries", len(st.session_state.mood_history))
-        else:
-            st.info("Start by analyzing your mood!")
+            for entry in st.session_state.mood_history:
+                db_manager.save_mood_entry(st.session_state.user_id, entry)
+        if st.session_state.journal_entries:
+            for entry in st.session_state.journal_entries:
+                db_manager.save_journal_entry(st.session_state.user_id, entry)
 
-# Mood Analysis page
-elif page == "Mood Analysis":
-    st.title("🎭 Comprehensive Mood Analysis")
+        # Clear session state
+        st.session_state.user_id = None
+        st.session_state.username = None
+        st.session_state.mood_history = []
+        st.session_state.journal_entries = []
+        st.rerun()
 
-    # Input section
-    st.markdown("### Share how you're feeling")
-    user_input = st.text_area(
-        "Describe your day, thoughts, or emotions:",
-        height=120,
-        placeholder="e.g., I had a stressful meeting today and I'm feeling overwhelmed..."
-    )
+    page = st.sidebar.radio("Navigate", ["Home", "Mood Analysis", "Journal", "Progress Dashboard", "Wellness Tools"])
 
-    # Voice input option (placeholder for future implementation)
-    if st.checkbox("🎤 Enable Voice Input (Coming Soon)"):
-        st.info("Voice-to-text integration will be available in the next update!")
+    # Home page
+    if page == "Home":
+        st.title("🧠 AI Mental Wellness Companion")
+        st.markdown("### Your Personal AI-Powered Mental Health Companion")
 
-    if st.button("🔍 Analyze My Emotional State", type="primary"):
-        if user_input.strip():
-            with st.spinner("🤖 Running comprehensive AI analysis..."):
-                # Multi-model analysis
-                emotion, emotion_conf = detect_emotion(user_input)
-                sentiment, sentiment_conf = analyze_sentiment(user_input)
-                stress_level = estimate_stress_level(emotion)
-                wellness_score = calculate_wellness_score(emotion, stress_level, sentiment)
-                insights = generate_insights(emotion, stress_level, sentiment, user_input)
-                coping_strategies = get_coping_strategies(emotion, stress_level)
+        col1, col2 = st.columns([2, 1])
 
-                # Text analysis
-                blob = TextBlob(user_input)
-                polarity = blob.sentiment.polarity
-                subjectivity = blob.sentiment.subjectivity
+        with col1:
+            st.markdown("""
+            Welcome to your comprehensive mental wellness companion! This AI-powered app provides:
 
-            # Save to history
-            entry = {
-                'timestamp': datetime.now(),
-                'text': user_input,
-                'emotion': emotion,
-                'emotion_conf': emotion_conf,
-                'sentiment': sentiment,
-                'stress_level': stress_level,
-                'wellness_score': wellness_score,
-                'polarity': polarity,
-                'subjectivity': subjectivity
-            }
-            st.session_state.mood_history.append(entry)
+            🎯 **Multi-Modal Analysis**: Emotion detection, sentiment analysis, and stress assessment
+            📊 **Progress Tracking**: Visual charts of your mood patterns over time
+            📝 **Therapeutic Journaling**: AI insights on your writing patterns
+            🛠️ **Wellness Tools**: Personalized coping strategies and mindfulness exercises
+            🎨 **Cheerful Interface**: Floating characters and friendly interactions
 
-            # Results display
-            st.success("🎉 Analysis Complete! Here's your comprehensive emotional profile:")
+            **Getting Started:**
+            1. Go to "Mood Analysis" to analyze your current emotional state
+            2. Use "Journal" to write and get AI-powered insights
+            3. Check "Progress Dashboard" for trends and patterns
+            4. Explore "Wellness Tools" for coping strategies
+            """)
 
-            # Main metrics
-            col1, col2, col3, col4 = st.columns(4)
+        with col2:
+            st.markdown("### Quick Stats")
+            if st.session_state.mood_history:
+                recent_emotions = [entry['emotion'] for entry in st.session_state.mood_history[-7:]]
+                most_common = max(set(recent_emotions), key=recent_emotions.count) if recent_emotions else "None"
+                st.metric("Most Common Emotion (Last 7)", most_common.capitalize())
+                st.metric("Total Entries", len(st.session_state.mood_history))
+            else:
+                st.info("Start by analyzing your mood!")
 
-            with col1:
-                st.metric("🎭 Primary Emotion", emotion.capitalize(), f"{emotion_conf:.1%}")
-            with col2:
-                st.metric("📊 Sentiment", sentiment.replace("LABEL_", "").replace("2", "Positive").replace("1", "Neutral").replace("0", "Negative"), f"{sentiment_conf:.1%}")
-            with col3:
-                st.metric("⚡ Stress Level", stress_level.capitalize())
-            with col4:
-                st.metric("🌟 Wellness Score", f"{wellness_score}/100")
+    # Mood Analysis page
+    elif page == "Mood Analysis":
+        st.title("🎭 Comprehensive Mood Analysis")
 
-            # Detailed analysis
-            st.markdown("### 📋 Detailed Analysis")
+        # Input section
+        st.markdown("### Share how you're feeling")
+        user_input = st.text_area(
+            "Describe your day, thoughts, or emotions:",
+            height=120,
+            placeholder="e.g., I had a stressful meeting today and I'm feeling overwhelmed..."
+        )
 
-            tab1, tab2, tab3 = st.tabs(["Emotional Profile", "AI Insights", "Coping Strategies"])
+        # Voice input option (placeholder for future implementation)
+        if st.checkbox("🎤 Enable Voice Input (Coming Soon)"):
+            st.info("Voice-to-text integration will be available in the next update!")
 
-            with tab1:
+        if st.button("🔍 Analyze My Emotional State", type="primary"):
+            if user_input.strip():
+                with st.spinner("🤖 Running comprehensive AI analysis..."):
+                    # Multi-model analysis
+                    emotion, emotion_conf = detect_emotion(user_input)
+                    sentiment, sentiment_conf = analyze_sentiment(user_input)
+                    stress_level = estimate_stress_level(emotion)
+                    wellness_score = calculate_wellness_score(emotion, stress_level, sentiment)
+                    insights = generate_insights(emotion, stress_level, sentiment, user_input)
+                    coping_strategies = get_coping_strategies(emotion, stress_level)
+
+                    # Text analysis
+                    blob = TextBlob(user_input)
+                    polarity = blob.sentiment.polarity
+                    subjectivity = blob.sentiment.subjectivity
+
+                # Save to history
+                entry = {
+                    'timestamp': datetime.now(),
+                    'text': user_input,
+                    'emotion': emotion,
+                    'emotion_conf': emotion_conf,
+                    'sentiment': sentiment,
+                    'stress_level': stress_level,
+                    'wellness_score': wellness_score,
+                    'polarity': polarity,
+                    'subjectivity': subjectivity
+                }
+                st.session_state.mood_history.append(entry)
+
+                # Results display
+                st.success("🎉 Analysis Complete! Here's your comprehensive emotional profile:")
+
+                # Main metrics
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.metric("🎭 Primary Emotion", emotion.capitalize(), f"{emotion_conf:.1%}")
+                with col2:
+                    st.metric("📊 Sentiment", sentiment.replace("LABEL_", "").replace("2", "Positive").replace("1", "Neutral").replace("0", "Negative"), f"{sentiment_conf:.1%}")
+                with col3:
+                    st.metric("⚡ Stress Level", stress_level.capitalize())
+                with col4:
+                    st.metric("🌟 Wellness Score", f"{wellness_score}/100")
+
+                # Detailed analysis
+                st.markdown("### 📋 Detailed Analysis")
+
+                tab1, tab2, tab3 = st.tabs(["Emotional Profile", "AI Insights", "Coping Strategies"])
+
+                with tab1:
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("**Text Characteristics:**")
+                        st.write(f"📏 Length: {len(user_input.split())} words")
+                        st.write(f"📈 Polarity: {polarity:.2f} (-1 to +1)")
+                        st.write(f"🎯 Subjectivity: {subjectivity:.2f} (0 to 1)")
+
+                    with col2:
+                        st.markdown("**Emotional Breakdown:**")
+                        # Simple emotion distribution (placeholder)
+                        emotion_data = pd.DataFrame({
+                            'Emotion': ['Joy', 'Sadness', 'Anger', 'Fear', 'Surprise', 'Disgust', 'Neutral'],
+                            'Intensity': [0.8 if emotion.lower() == 'joy' else 0.1,
+                                        0.8 if emotion.lower() == 'sadness' else 0.1,
+                                        0.8 if emotion.lower() == 'anger' else 0.1,
+                                        0.8 if emotion.lower() == 'fear' else 0.1,
+                                        0.8 if emotion.lower() == 'surprise' else 0.1,
+                                        0.8 if emotion.lower() == 'disgust' else 0.1,
+                                        0.8 if emotion.lower() == 'neutral' else 0.1]
+                        })
+                        st.bar_chart(emotion_data.set_index('Emotion'))
+
+                with tab2:
+                    st.markdown("**🤖 AI-Generated Insights:**")
+                    if insights:
+                        for insight in insights:
+                            st.info(insight)
+                    else:
+                        st.write("✨ Your emotional state appears balanced. Keep up the good work!")
+
+                    # Wellness interpretation
+                    if wellness_score >= 80:
+                        st.success("🌟 Excellent mental wellness! You're in a great emotional state.")
+                    elif wellness_score >= 60:
+                        st.info("👍 Good mental wellness. Consider the coping strategies below.")
+                    elif wellness_score >= 40:
+                        st.warning("⚠️ Moderate mental wellness. Pay attention to your emotional needs.")
+                    else:
+                        st.error("🚨 Low mental wellness detected. Consider professional support.")
+
+                with tab3:
+                    st.markdown("**🛠️ Personalized Coping Strategies:**")
+                    for i, strategy in enumerate(coping_strategies, 1):
+                        st.write(f"{i}. {strategy}")
+
+                    if stress_level == 'high':
+                        st.warning("💡 For high stress, try immediate interventions like deep breathing or stepping away from triggers.")
+
+            else:
+                st.error("Please share your thoughts so I can analyze them!")
+
+    # Journal page
+    elif page == "Journal":
+        st.title("📝 Therapeutic Journal")
+
+        st.markdown("### Write freely and receive AI-powered insights")
+
+        journal_input = st.text_area(
+            "What's on your mind today?",
+            height=200,
+            placeholder="Write about your day, your feelings, your thoughts... anything that comes to mind."
+        )
+
+        if st.button("💭 Get AI Journal Insights"):
+            if journal_input.strip():
+                with st.spinner("Analyzing your journal entry..."):
+                    emotion, _ = detect_emotion(journal_input)
+                    sentiment, _ = analyze_sentiment(journal_input)
+                    stress_level = estimate_stress_level(emotion)
+                    insights = generate_insights(emotion, stress_level, sentiment, journal_input)
+
+                    # Save journal entry
+                    journal_entry = {
+                        'timestamp': datetime.now(),
+                        'content': journal_input,
+                        'emotion': emotion,
+                        'sentiment': sentiment,
+                        'insights': insights
+                    }
+                    st.session_state.journal_entries.append(journal_entry)
+
+                st.success("Journal entry analyzed!")
+
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("**Text Characteristics:**")
-                    st.write(f"📏 Length: {len(user_input.split())} words")
-                    st.write(f"📈 Polarity: {polarity:.2f} (-1 to +1)")
-                    st.write(f"🎯 Subjectivity: {subjectivity:.2f} (0 to 1)")
+                    st.metric("Detected Emotion", emotion.capitalize())
+                    st.metric("Overall Sentiment", sentiment.replace("LABEL_", "").replace("2", "Positive").replace("1", "Neutral").replace("0", "Negative"))
 
                 with col2:
-                    st.markdown("**Emotional Breakdown:**")
-                    # Simple emotion distribution (placeholder)
-                    emotion_data = pd.DataFrame({
-                        'Emotion': ['Joy', 'Sadness', 'Anger', 'Fear', 'Surprise', 'Disgust', 'Neutral'],
-                        'Intensity': [0.8 if emotion.lower() == 'joy' else 0.1,
-                                    0.8 if emotion.lower() == 'sadness' else 0.1,
-                                    0.8 if emotion.lower() == 'anger' else 0.1,
-                                    0.8 if emotion.lower() == 'fear' else 0.1,
-                                    0.8 if emotion.lower() == 'surprise' else 0.1,
-                                    0.8 if emotion.lower() == 'disgust' else 0.1,
-                                    0.8 if emotion.lower() == 'neutral' else 0.1]
-                    })
-                    st.bar_chart(emotion_data.set_index('Emotion'))
+                    st.metric("Stress Indicators", stress_level.capitalize())
+                    st.metric("Word Count", len(journal_input.split()))
 
-            with tab2:
-                st.markdown("**🤖 AI-Generated Insights:**")
                 if insights:
+                    st.markdown("### 🤖 AI Insights on Your Writing:")
                     for insight in insights:
                         st.info(insight)
-                else:
-                    st.write("✨ Your emotional state appears balanced. Keep up the good work!")
 
-                # Wellness interpretation
-                if wellness_score >= 80:
-                    st.success("🌟 Excellent mental wellness! You're in a great emotional state.")
-                elif wellness_score >= 60:
-                    st.info("👍 Good mental wellness. Consider the coping strategies below.")
-                elif wellness_score >= 40:
-                    st.warning("⚠️ Moderate mental wellness. Pay attention to your emotional needs.")
-                else:
-                    st.error("🚨 Low mental wellness detected. Consider professional support.")
-
-            with tab3:
-                st.markdown("**🛠️ Personalized Coping Strategies:**")
-                for i, strategy in enumerate(coping_strategies, 1):
-                    st.write(f"{i}. {strategy}")
-
-                if stress_level == 'high':
-                    st.warning("💡 For high stress, try immediate interventions like deep breathing or stepping away from triggers.")
-
-        else:
-            st.error("Please share your thoughts so I can analyze them!")
-
-# Journal page
-elif page == "Journal":
-    st.title("📝 Therapeutic Journal")
-
-    st.markdown("### Write freely and receive AI-powered insights")
-
-    journal_input = st.text_area(
-        "What's on your mind today?",
-        height=200,
-        placeholder="Write about your day, your feelings, your thoughts... anything that comes to mind."
-    )
-
-    if st.button("💭 Get AI Journal Insights"):
-        if journal_input.strip():
-            with st.spinner("Analyzing your journal entry..."):
-                emotion, _ = detect_emotion(journal_input)
-                sentiment, _ = analyze_sentiment(journal_input)
-                stress_level = estimate_stress_level(emotion)
-                insights = generate_insights(emotion, stress_level, sentiment, journal_input)
-
-                # Save journal entry
-                journal_entry = {
-                    'timestamp': datetime.now(),
-                    'content': journal_input,
-                    'emotion': emotion,
-                    'sentiment': sentiment,
-                    'insights': insights
-                }
-                st.session_state.journal_entries.append(journal_entry)
-
-            st.success("Journal entry analyzed!")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.metric("Detected Emotion", emotion.capitalize())
-                st.metric("Overall Sentiment", sentiment.replace("LABEL_", "").replace("2", "Positive").replace("1", "Neutral").replace("0", "Negative"))
-
-            with col2:
-                st.metric("Stress Indicators", stress_level.capitalize())
-                st.metric("Word Count", len(journal_input.split()))
-
-            if insights:
-                st.markdown("### 🤖 AI Insights on Your Writing:")
-                for insight in insights:
-                    st.info(insight)
-
-            # Journal history
-            if len(st.session_state.journal_entries) > 1:
-                st.markdown("### 📚 Recent Journal Entries")
-                for entry in st.session_state.journal_entries[-3:]:
-                    with st.expander(f"📅 {entry['timestamp'].strftime('%Y-%m-%d %H:%M')} - {entry['emotion'].capitalize()}"):
-                        st.write(entry['content'][:200] + "..." if len(entry['content']) > 200 else entry['content'])
-                        if entry['insights']:
-                            st.write("**AI Insights:**", entry['insights'][0])
+                # Journal history
+                if len(st.session_state.journal_entries) > 1:
+                    st.markdown("### 📚 Recent Journal Entries")
+                    for entry in st.session_state.journal_entries[-3:]:
+                        with st.expander(f"📅 {entry['timestamp'].strftime('%Y-%m-%d %H:%M')} - {entry['emotion'].capitalize()}"):
+                            st.write(entry['content'][:200] + "..." if len(entry['content']) > 200 else entry['content'])
+                            if entry['insights']:
+                                st.write("**AI Insights:**", entry['insights'][0])
 
         else:
             st.error("Please write something in your journal!")
 
-# Progress Dashboard
-elif page == "Progress Dashboard":
-    st.title("📊 Mental Wellness Progress Dashboard")
+    # Progress Dashboard
+    elif page == "Progress Dashboard":
+        st.title("📊 Mental Wellness Progress Dashboard")
 
-    if not st.session_state.mood_history:
-        st.info("Start by analyzing your mood in the 'Mood Analysis' tab to see your progress here!")
-    else:
-        # Convert history to DataFrame
-        df = pd.DataFrame(st.session_state.mood_history)
-        df['date'] = pd.to_datetime(df['timestamp']).dt.date
-        df['time'] = pd.to_datetime(df['timestamp']).dt.time
-
-        # Overview metrics
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            avg_wellness = df['wellness_score'].mean()
-            st.metric("Avg Wellness Score", f"{avg_wellness:.1f}/100")
-
-        with col2:
-            most_common_emotion = df['emotion'].mode().iloc[0]
-            st.metric("Dominant Emotion", most_common_emotion.capitalize())
-
-        with col3:
-            stress_counts = df['stress_level'].value_counts()
-            most_common_stress = stress_counts.index[0]
-            st.metric("Common Stress Level", most_common_stress.capitalize())
-
-        with col4:
-            total_entries = len(df)
-            st.metric("Total Analyses", total_entries)
-
-        # Charts
-        st.markdown("### 📈 Mood Trends Over Time")
-
-        # Emotion timeline
-        emotion_timeline = df.groupby('date')['emotion'].agg(lambda x: x.mode().iloc[0] if len(x) > 0 else 'neutral').reset_index()
-        emotion_timeline['emotion_code'] = emotion_timeline['emotion'].map({
-            'joy': 5, 'neutral': 3, 'surprise': 4,
-            'sadness': 1, 'disgust': 2, 'anger': 0, 'fear': 0
-        })
-
-        fig_emotion = px.line(emotion_timeline, x='date', y='emotion_code',
-                             title="Emotional Journey",
-                             labels={'emotion_code': 'Emotional State (Higher = More Positive)'})
-        fig_emotion.update_yaxes(tickvals=[0,1,2,3,4,5],
-                                ticktext=['Anger/Fear', 'Sadness', 'Disgust', 'Neutral', 'Surprise', 'Joy'])
-        st.plotly_chart(fig_emotion, use_container_width=True)
-
-        # Wellness score trend
-        fig_wellness = px.line(df, x='timestamp', y='wellness_score',
-                              title="Wellness Score Trend",
-                              labels={'wellness_score': 'Wellness Score', 'timestamp': 'Time'})
-        st.plotly_chart(fig_wellness, use_container_width=True)
-
-        # Emotion distribution
+        # Data Export/Import Section
+        st.markdown("### 💾 Data Management")
         col1, col2 = st.columns(2)
 
         with col1:
-            emotion_counts = df['emotion'].value_counts()
-            fig_pie = px.pie(values=emotion_counts.values, names=emotion_counts.index,
-                           title="Emotion Distribution")
-            st.plotly_chart(fig_pie, use_container_width=True)
+            if st.button("📤 Export Your Data"):
+                if st.session_state.mood_history or st.session_state.journal_entries:
+                    export_data = {
+                        'mood_history': st.session_state.mood_history,
+                        'journal_entries': st.session_state.journal_entries,
+                        'export_date': datetime.now().isoformat()
+                    }
+                    export_json = json.dumps(export_data, default=str, indent=2)
+                    st.download_button(
+                        label="📥 Download Data File",
+                        data=export_json,
+                        file_name=f"mental_wellness_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json"
+                    )
+                    st.success("✅ Data export ready! Click the download button above.")
+                else:
+                    st.warning("No data to export yet. Start by analyzing your mood!")
 
         with col2:
-            stress_counts = df['stress_level'].value_counts()
-            fig_stress = px.bar(x=stress_counts.index, y=stress_counts.values,
-                              title="Stress Level Distribution",
-                              labels={'x': 'Stress Level', 'y': 'Count'})
-            st.plotly_chart(fig_stress, use_container_width=True)
+            uploaded_file = st.file_uploader("📥 Import Previous Data", type=['json'])
+            if uploaded_file is not None:
+                try:
+                    imported_data = json.load(uploaded_file)
+                    if 'mood_history' in imported_data:
+                        # Merge with existing data, avoiding duplicates
+                        existing_timestamps = {entry['timestamp'] for entry in st.session_state.mood_history}
+                        new_entries = [entry for entry in imported_data['mood_history']
+                                     if entry['timestamp'] not in existing_timestamps]
+                        st.session_state.mood_history.extend(new_entries)
+                        st.success(f"✅ Imported {len(new_entries)} mood analysis entries!")
 
-        # Insights
-        st.markdown("### 💡 AI-Generated Insights")
+                    if 'journal_entries' in imported_data:
+                        existing_timestamps = {entry['timestamp'] for entry in st.session_state.journal_entries}
+                        new_entries = [entry for entry in imported_data['journal_entries']
+                                     if entry['timestamp'] not in existing_timestamps]
+                        st.session_state.journal_entries.extend(new_entries)
+                        st.success(f"✅ Imported {len(new_entries)} journal entries!")
 
-        # Calculate trends
-        recent_scores = df['wellness_score'].tail(5)
-        if len(recent_scores) >= 2:
-            trend = "improving" if recent_scores.iloc[-1] > recent_scores.iloc[0] else "declining"
-            st.info(f"📈 Your wellness trend is {trend} over the last {len(recent_scores)} analyses.")
+                except Exception as e:
+                    st.error(f"❌ Error importing data: {str(e)}")
 
-        # Most improved areas
-        if len(df) >= 3:
-            avg_emotion_positive = df[df['emotion'].isin(['joy', 'neutral'])]['wellness_score'].mean()
-            avg_emotion_negative = df[~df['emotion'].isin(['joy', 'neutral'])]['wellness_score'].mean()
+        st.markdown("---")
 
-            if pd.notna(avg_emotion_positive) and pd.notna(avg_emotion_negative):
-                if avg_emotion_positive > avg_emotion_negative + 10:
-                    st.success("🌟 You tend to have higher wellness scores during positive emotions - great awareness!")
-                elif avg_emotion_negative > avg_emotion_positive + 10:
-                    st.warning("⚠️ Your wellness scores are lower during negative emotions. Consider building coping strategies.")
+        if not st.session_state.mood_history:
+            st.info("Start by analyzing your mood in the 'Mood Analysis' tab to see your progress here!")
+            st.markdown("""
+            **💡 Pro Tip:** Your data is stored temporarily during your session. To keep your progress between visits:
+            - Use the **Export** button above to save your data as a JSON file
+            - Use the **Import** button to restore your data when you return
+            """)
+        else:
+            # Convert history to DataFrame
+            df = pd.DataFrame(st.session_state.mood_history)
+            df['date'] = pd.to_datetime(df['timestamp']).dt.date
+            df['time'] = pd.to_datetime(df['timestamp']).dt.time
 
-# Wellness Tools page
-elif page == "Wellness Tools":
-    st.title("🛠️ Wellness Tools & Resources")
+            # Overview metrics
+            col1, col2, col3, col4 = st.columns(4)
 
-    st.markdown("### Personalized tools based on your emotional patterns")
+            with col1:
+                avg_wellness = df['wellness_score'].mean()
+                st.metric("Avg Wellness Score", f"{avg_wellness:.1f}/100")
 
-    if st.session_state.mood_history:
-        # Get user's most common emotion and stress patterns
-        recent_emotions = [entry['emotion'] for entry in st.session_state.mood_history[-10:]]
-        recent_stress = [entry['stress_level'] for entry in st.session_state.mood_history[-10:]]
+            with col2:
+                most_common_emotion = df['emotion'].mode().iloc[0]
+                st.metric("Dominant Emotion", most_common_emotion.capitalize())
 
-        most_common_emotion = max(set(recent_emotions), key=recent_emotions.count) if recent_emotions else 'neutral'
-        most_common_stress = max(set(recent_stress), key=recent_stress.count) if recent_stress else 'low'
+            with col3:
+                stress_counts = df['stress_level'].value_counts()
+                most_common_stress = stress_counts.index[0]
+                st.metric("Common Stress Level", most_common_stress.capitalize())
 
-        st.markdown(f"**Based on your recent patterns:** Most common emotion is **{most_common_emotion}** with **{most_common_stress}** stress levels.")
+            with col4:
+                total_entries = len(df)
+                st.metric("Total Analyses", total_entries)
 
-    # Breathing exercises
-    st.markdown("### 🫁 Breathing Exercises")
+            # Charts
+            st.markdown("### 📈 Mood Trends Over Time")
 
-    col1, col2, col3 = st.columns(3)
+            # Emotion timeline
+            emotion_timeline = df.groupby('date')['emotion'].agg(lambda x: x.mode().iloc[0] if len(x) > 0 else 'neutral').reset_index()
+            emotion_timeline['emotion_code'] = emotion_timeline['emotion'].map({
+                'joy': 5, 'neutral': 3, 'surprise': 4,
+                'sadness': 1, 'disgust': 2, 'anger': 0, 'fear': 0
+            })
 
-    with col1:
-        if st.button("4-7-8 Breathing"):
-            st.success("**4-7-8 Technique:**\n1. Inhale quietly through nose for 4 seconds\n2. Hold breath for 7 seconds\n3. Exhale through mouth for 8 seconds\n\nRepeat 4 times. Great for stress relief!")
+            fig_emotion = px.line(emotion_timeline, x='date', y='emotion_code',
+                                 title="Emotional Journey",
+                                 labels={'emotion_code': 'Emotional State (Higher = More Positive)'})
+            fig_emotion.update_yaxes(tickvals=[0,1,2,3,4,5],
+                                    ticktext=['Anger/Fear', 'Sadness', 'Disgust', 'Neutral', 'Surprise', 'Joy'])
+            st.plotly_chart(fig_emotion, use_container_width=True)
 
-    with col2:
-        if st.button("Box Breathing"):
-            st.success("**Box Breathing:**\n1. Inhale for 4 counts\n2. Hold for 4 counts\n3. Exhale for 4 counts\n4. Hold for 4 counts\n\nRepeat. Excellent for focus and calm.")
+            # Wellness score trend
+            fig_wellness = px.line(df, x='timestamp', y='wellness_score',
+                                  title="Wellness Score Trend",
+                                  labels={'wellness_score': 'Wellness Score', 'timestamp': 'Time'})
+            st.plotly_chart(fig_wellness, use_container_width=True)
 
-    with col3:
-        if st.button("Deep Breathing"):
-            st.success("**Deep Breathing:**\n1. Place one hand on belly\n2. Inhale slowly through nose for 4 counts\n3. Feel belly rise\n4. Exhale slowly through mouth for 6 counts\n\nRepeat 5 times.")
+            # Emotion distribution
+            col1, col2 = st.columns(2)
 
-    # Mindfulness prompts
-    st.markdown("### 🧘 Mindfulness Prompts")
+            with col1:
+                emotion_counts = df['emotion'].value_counts()
+                fig_pie = px.pie(values=emotion_counts.values, names=emotion_counts.index,
+                               title="Emotion Distribution")
+                st.plotly_chart(fig_pie, use_container_width=True)
 
-    prompts = [
-        "What am I grateful for right now?",
-        "What would I say to a friend feeling this way?",
-        "What's one small thing I can do to feel better?",
-        "What does my body need in this moment?",
-        "What strengths have helped me through difficult times before?"
-    ]
+            with col2:
+                stress_counts = df['stress_level'].value_counts()
+                fig_stress = px.bar(x=stress_counts.index, y=stress_counts.values,
+                                  title="Stress Level Distribution",
+                                  labels={'x': 'Stress Level', 'y': 'Count'})
+                st.plotly_chart(fig_stress, use_container_width=True)
 
-    if st.button("🎯 Get Random Mindfulness Prompt"):
-        prompt = random.choice(prompts)
-        st.info(f"**Today's Mindfulness Prompt:** {prompt}")
+            # Insights
+            st.markdown("### 💡 AI-Generated Insights")
 
-    # Quick mood boosters
-    st.markdown("### ⚡ Quick Mood Boosters")
+            # Calculate trends
+            recent_scores = df['wellness_score'].tail(5)
+            if len(recent_scores) >= 2:
+                trend = "improving" if recent_scores.iloc[-1] > recent_scores.iloc[0] else "declining"
+                st.info(f"📈 Your wellness trend is {trend} over the last {len(recent_scores)} analyses.")
 
-    boosters = [
-        "☀️ Step outside for 5 minutes of sunlight",
-        "🎵 Listen to your favorite uplifting song",
-        "💃 Dance like nobody's watching for 2 minutes",
-        "📞 Call or text someone you care about",
-        "🎨 Draw or doodle for 5 minutes",
-        "🚶‍♀️ Take a 10-minute walk",
-        "📚 Read an inspiring quote or story",
-        "🛀 Take a warm shower or bath",
-        "🍎 Eat something nourishing",
-        "😴 Take a 5-minute power nap"
-    ]
+            # Most improved areas
+            if len(df) >= 3:
+                avg_emotion_positive = df[df['emotion'].isin(['joy', 'neutral'])]['wellness_score'].mean()
+                avg_emotion_negative = df[~df['emotion'].isin(['joy', 'neutral'])]['wellness_score'].mean()
 
-    if st.button("🚀 Get Quick Mood Booster"):
-        booster = random.choice(boosters)
-        st.success(f"**Try this:** {booster}")
+                if pd.notna(avg_emotion_positive) and pd.notna(avg_emotion_negative):
+                    if avg_emotion_positive > avg_emotion_negative + 10:
+                        st.success("🌟 You tend to have higher wellness scores during positive emotions - great awareness!")
+                    elif avg_emotion_negative > avg_emotion_positive + 10:
+                        st.warning("⚠️ Your wellness scores are lower during negative emotions. Consider building coping strategies.")
 
-    # Emergency resources
-    st.markdown("### 🚨 Crisis Resources")
+    # Wellness Tools page
+    elif page == "Wellness Tools":
+        st.title("🛠️ Wellness Tools & Resources")
 
-    st.info("""
-    **If you're in crisis or having thoughts of self-harm:**
+        st.markdown("### Personalized tools based on your emotional patterns")
 
-    - **National Suicide Prevention Lifeline**: 988 (US)
-    - **Crisis Text Line**: Text HOME to 741741
-    - **International Association for Suicide Prevention**: Visit befrienders.org
-    - **Emergency Services**: Call 911 (US) or your local emergency number
+        if st.session_state.mood_history:
+            # Get user's most common emotion and stress patterns
+            recent_emotions = [entry['emotion'] for entry in st.session_state.mood_history[-10:]]
+            recent_stress = [entry['stress_level'] for entry in st.session_state.mood_history[-10:]]
 
-    Remember: You're not alone, and help is available 24/7.
-    """)
+            most_common_emotion = max(set(recent_emotions), key=recent_emotions.count) if recent_emotions else 'neutral'
+            most_common_stress = max(set(recent_stress), key=recent_stress.count) if recent_stress else 'low'
+
+            st.markdown(f"**Based on your recent patterns:** Most common emotion is **{most_common_emotion}** with **{most_common_stress}** stress levels.")
+
+        # Breathing exercises
+        st.markdown("### 🫁 Breathing Exercises")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("4-7-8 Breathing"):
+                st.success("**4-7-8 Technique:**\n1. Inhale quietly through nose for 4 seconds\n2. Hold breath for 7 seconds\n3. Exhale through mouth for 8 seconds\n\nRepeat 4 times. Great for stress relief!")
+
+        with col2:
+            if st.button("Box Breathing"):
+                st.success("**Box Breathing:**\n1. Inhale for 4 counts\n2. Hold for 4 counts\n3. Exhale for 4 counts\n4. Hold for 4 counts\n\nRepeat. Excellent for focus and calm.")
+
+        with col3:
+            if st.button("Deep Breathing"):
+                st.success("**Deep Breathing:**\n1. Place one hand on belly\n2. Inhale slowly through nose for 4 counts\n3. Feel belly rise\n4. Exhale slowly through mouth for 6 counts\n\nRepeat 5 times.")
+
+        # Mindfulness prompts
+        st.markdown("### 🧘 Mindfulness Prompts")
+
+        prompts = [
+            "What am I grateful for right now?",
+            "What would I say to a friend feeling this way?",
+            "What's one small thing I can do to feel better?",
+            "What does my body need in this moment?",
+            "What strengths have helped me through difficult times before?"
+        ]
+
+        if st.button("🎯 Get Random Mindfulness Prompt"):
+            prompt = random.choice(prompts)
+            st.info(f"**Today's Mindfulness Prompt:** {prompt}")
+
+        # Quick mood boosters
+        st.markdown("### ⚡ Quick Mood Boosters")
+
+        boosters = [
+            "☀️ Step outside for 5 minutes of sunlight",
+            "🎵 Listen to your favorite uplifting song",
+            "💃 Dance like nobody's watching for 2 minutes",
+            "📞 Call or text someone you care about",
+            "🎨 Draw or doodle for 5 minutes",
+            "🚶‍♀️ Take a 10-minute walk",
+            "📚 Read an inspiring quote or story",
+            "🛀 Take a warm shower or bath",
+            "🍎 Eat something nourishing",
+            "😴 Take a 5-minute power nap"
+        ]
+
+        if st.button("🚀 Get Quick Mood Booster"):
+            booster = random.choice(boosters)
+            st.success(f"**Try this:** {booster}")
+
+        # Emergency resources
+        st.markdown("### 🚨 Crisis Resources")
+
+        st.info("""
+        **If you're in crisis or having thoughts of self-harm:**
+
+        - **National Suicide Prevention Lifeline**: 988 (US)
+        - **Crisis Text Line**: Text HOME to 741741
+        - **International Association for Suicide Prevention**: Visit befrienders.org
+        - **Emergency Services**: Call 911 (US) or your local emergency number
+
+        Remember: You're not alone, and help is available 24/7.
+        """)
 
 # Footer
 st.markdown("---")
