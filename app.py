@@ -30,10 +30,10 @@ def estimate_stress_level(emotion):
     }
     return stress_mapping.get(emotion.lower(), 'medium')
 
-# Animated chibi characters
+# Animated chibi characters - larger anime-style
 def floating_characters():
     characters = [
-        "🐱", "🐶", "🐰", "🐼", "🦊", "🐻", "🐨", "🐸",
+        "🐱‍👤", "🐶‍👤", "🐰‍👤", "🐼‍👤", "🦊‍👤", "🐻‍👤", "🐨‍👤", "🐸‍👤",
         "🌸", "🌺", "🌻", "🌼", "🌹", "🌷", "🌻", "🌸"
     ]
     return random.choice(characters)
@@ -50,7 +50,7 @@ st.markdown("""
 
 .floating-char {
     animation: float 3s ease-in-out infinite;
-    font-size: 2rem;
+    font-size: 4rem;
     display: inline-block;
     margin: 0 10px;
 }
