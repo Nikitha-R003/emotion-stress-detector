@@ -16,31 +16,31 @@ from database import db_manager
 # Set page config at the very beginning
 st.set_page_config(page_title="AI Mental Wellness Companion", page_icon="🧠", layout="wide")
 
-# Custom CSS for light theme
+# Custom CSS for dark theme
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: #1e1e1e;
+    color: #ffffff;
 }
 [data-testid="stSidebar"] {
-    background-color: #f8f9fa;
-    color: #000000;
+    background-color: #2d2d2d;
+    color: #ffffff;
 }
 [data-testid="stHeader"] {
-    background-color: #ffffff;
+    background-color: #1e1e1e;
 }
 .stTextInput, .stTextArea, .stSelectbox, .stMultiselect {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: #3d3d3d;
+    color: #ffffff;
 }
 .stButton button {
-    background-color: #007bff;
+    background-color: #4CAF50;
     color: white;
 }
 .stSuccess, .stInfo, .stWarning, .stError {
-    background-color: #f8f9fa;
-    color: #000000;
+    background-color: #2d2d2d;
+    color: #ffffff;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -50,7 +50,8 @@ nltk.download('punkt', quiet=True)
 # Load the emotion detection model (zero-shot classification for broader emotion coverage)
 @st.cache_resource
 def load_emotion_model():
-    return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+    with st.spinner("🤖 Loading AI emotion detection model... This may take a moment on first run."):
+        return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 emotion_model = load_emotion_model()
 
