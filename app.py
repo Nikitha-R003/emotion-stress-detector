@@ -848,6 +848,19 @@ else:
             if st.button("Deep Breathing"):
                 st.success("**Deep Breathing:**\n1. Place one hand on belly\n2. Inhale slowly through nose for 4 counts\n3. Feel belly rise\n4. Exhale slowly through mouth for 6 counts\n\nRepeat 5 times.")
 
+        # Indian Pranayama Techniques
+        st.markdown("### 🧘‍♀️ Indian Pranayama Techniques")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Kapalabhati (Skull Shining)"):
+                st.success("**Kapalabhati Pranayama:**\n1. Sit comfortably with spine straight\n2. Place hands on knees, palms up\n3. Inhale deeply through both nostrils\n4. Exhale forcefully through nose, pulling belly in\n5. Focus on forceful exhalation, inhalation happens naturally\n\nDo 20-30 breaths per round, 3 rounds. Energizes mind and body!")
+
+        with col2:
+            if st.button("Anulom Vilom (Alternate Nostril)"):
+                st.success("**Anulom Vilom Pranayama:**\n1. Sit comfortably, spine straight\n2. Close right nostril with thumb\n3. Inhale slowly through left nostril for 4 counts\n4. Close left nostril with ring finger, open right\n5. Exhale through right nostril for 4 counts\n6. Inhale through right for 4 counts\n7. Close right, open left, exhale for 4 counts\n\nContinue for 5-10 minutes. Balances energy and reduces stress.")
+
         # Mindfulness prompts
         st.markdown("### 🧘 Mindfulness Prompts")
 
@@ -856,7 +869,18 @@ else:
             "What would I say to a friend feeling this way?",
             "What's one small thing I can do to feel better?",
             "What does my body need in this moment?",
-            "What strengths have helped me through difficult times before?"
+            "What strengths have helped me through difficult times before?",
+            "How can I cultivate inner peace today? (Inspired by Bhagavad Gita)",
+            "What is my dharma (duty) in this situation?",
+            "How can I practice ahimsa (non-violence) towards myself today?",
+            "What wisdom from ancient Indian teachings resonates with me now?",
+            "How can I find balance between action and detachment?",
+            "What does 'Vasudhaiva Kutumbakam' (World is One Family) mean to me today?",
+            "How can I embody 'Satya' (truth) in my thoughts and actions?",
+            "What role does 'Karma Yoga' (selfless action) play in my daily life?",
+            "How can I practice 'Dhyana' (meditation) to quiet my mind?",
+            "What lessons from the Upanishads can guide me through this challenge?",
+            "How can I cultivate 'Shanti' (peace) within myself and extend it to others?"
         ]
 
         if st.button("🎯 Get Random Mindfulness Prompt"):
@@ -876,7 +900,15 @@ else:
             "📚 Read an inspiring quote or story",
             "🛀 Take a warm shower or bath",
             "🍎 Eat something nourishing",
-            "😴 Take a 5-minute power nap"
+            "😴 Take a 5-minute power nap",
+            "🕉️ Chant 'Om' for 5 minutes to center yourself",
+            "🍵 Enjoy a cup of warm chai tea with loved ones",
+            "🙏 Practice a short prayer or gratitude ritual",
+            "🎵 Listen to devotional bhajans or kirtans",
+            "🧘‍♀️ Try a simple yoga asana like Child's Pose (Balasana)",
+            "🌺 Light incense or use essential oils for aromatherapy",
+            "📿 Practice japa meditation with a mala",
+            "🍛 Cook or eat traditional Indian comfort food"
         ]
 
         if st.button("🚀 Get Quick Mood Booster"):
@@ -889,10 +921,11 @@ else:
         st.info("""
         **If you're in crisis or having thoughts of self-harm:**
 
-        - **National Suicide Prevention Lifeline**: 988 (US)
-        - **Crisis Text Line**: Text HOME to 741741
-        - **International Association for Suicide Prevention**: Visit befrienders.org
-        - **Emergency Services**: Call 911 (US) or your local emergency number
+        - **AASRA Helpline**: 9820466726 (24/7 support)
+        - **Vandrevala Foundation**: 9999666555 (Mental health helpline)
+        - **Sneha India**: 044-24640050 (Suicide prevention)
+        - **Befrienders Worldwide**: Visit befrienders.org (International support)
+        - **Emergency Services**: Call 112 or your local police
 
         Remember: You're not alone, and help is available 24/7.
         """)

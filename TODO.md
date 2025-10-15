@@ -1,14 +1,10 @@
-# TODO: Expand Emotion Detection to 24 Emotions
+# TODO: Make Wellness Tools Relevant to India
 
-## Completed Tasks
-- [x] Plan approved by user: Expand emotion detection to include all 24 specified emotions
-- [x] Switch to zero-shot classification using "facebook/bart-large-mnli" model
-- [x] Update detect_emotion function to classify into all 24 emotions
-- [x] Revise emotion_mapping, stress_mapping, and get_coping_strategies to handle all new emotions
-- [x] Update test_emotion_detection.py with comprehensive test cases for new emotions
-- [x] Modify README.md to reflect expanded emotion detection
-
-## Pending Tasks
-- [x] Test emotion detection accuracy with new model
-- [x] Run updated test suite
-- [x] Verify app functionality with expanded emotions
+## Tasks to Complete
+- [ ] Update Crisis Resources section with Indian helplines (AASRA, Vandrevala Foundation, Sneha India, iCall, One Life, national helplines)
+- [ ] Add Indian pranayama techniques (Kapalabhati, Anulom Vilom) to Breathing Exercises
+- [ ] Update Mindfulness Prompts to include prompts inspired by Indian philosophy (Bhagavad Gita, general wisdom)
+- [ ] Update Quick Mood Boosters with culturally relevant activities (bhajans, chai, yoga asanas)
+- [ ] Add new "Indian Wellness Practices" section with yoga poses, meditation styles, traditional remedies
+- [ ] Test the updated Wellness Tools page
+- [ ] Update project summary in TODO.md
