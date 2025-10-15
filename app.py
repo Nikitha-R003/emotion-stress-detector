@@ -47,12 +47,20 @@ st.markdown("""
 
 nltk.download('punkt', quiet=True)
 
-# Load the emotion detection model
+# Load the emotion detection model (zero-shot classification for broader emotion coverage)
 @st.cache_resource
 def load_emotion_model():
-    return pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+    return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 emotion_model = load_emotion_model()
+
+# Define all 24 emotions for classification
+ALL_EMOTIONS = [
+    "Anger", "Fear", "Sadness", "Disgust", "Happiness", "Anxiety", "Envy", "Excitement",
+    "Love", "Shame", "Disappointment", "Surprise", "AWE", "Calmness", "Confusion",
+    "Empathy", "Enjoyment", "Gratitude", "Joy", "Acceptance", "Amusement", "Anticipation",
+    "Contempt", "Contentment"
+]
 
 # Function to detect emotion and map to user-friendly labels
 def detect_emotion(text):
@@ -61,27 +69,44 @@ def detect_emotion(text):
     if any(keyword in text.lower() for keyword in sleepy_keywords):
         return 'sleepy', 0.9
 
-    result = emotion_model(text)
-    raw_emotion = result[0]['label']
-    confidence = result[0]['score']
+    # Use zero-shot classification with all 24 emotions
+    result = emotion_model(text, ALL_EMOTIONS, multi_label=False)
+    emotion = result['labels'][0]  # Get the top prediction
+    confidence = result['scores'][0]
 
-    # Map model emotions to user-requested emotions
-    emotion_mapping = {
-        'joy': 'happy',
-        'sadness': 'sad',
-        'anger': 'angry',
-        'fear': 'stressed',  # Map fear to stressed
-        'surprise': 'surprised',  # Keep as surprised
-        'disgust': 'disgusted',  # Keep as disgusted
-        'neutral': 'calm'
-    }
+    # Normalize emotion name (remove any extra spaces, make lowercase for consistency)
+    emotion = emotion.strip().lower()
 
-    emotion = emotion_mapping.get(raw_emotion.lower(), 'neutral')
     return emotion, confidence
 
 # Function to estimate stress level based on emotion
 def estimate_stress_level(emotion):
     stress_mapping = {
+        'anger': 'high',
+        'fear': 'high',
+        'sadness': 'medium',
+        'disgust': 'high',
+        'happiness': 'low',
+        'anxiety': 'high',
+        'envy': 'medium',
+        'excitement': 'low',
+        'love': 'low',
+        'shame': 'high',
+        'disappointment': 'medium',
+        'surprise': 'medium',
+        'awe': 'low',
+        'calmness': 'low',
+        'confusion': 'medium',
+        'empathy': 'low',
+        'enjoyment': 'low',
+        'gratitude': 'low',
+        'joy': 'low',
+        'acceptance': 'low',
+        'amusement': 'low',
+        'anticipation': 'medium',
+        'contempt': 'high',
+        'contentment': 'low',
+        # Legacy mappings for backward compatibility
         'happy': 'low',
         'sad': 'medium',
         'angry': 'high',
@@ -116,8 +141,29 @@ def analyze_sentiment(text):
 
 # Function to calculate wellness score
 def calculate_wellness_score(emotion, stress_level, sentiment):
-    # Base scores - updated to match new emotion mapping
+    # Base scores for all 24 emotions
     emotion_scores = {
+        # High positive emotions (80-90)
+        'happiness': 90, 'joy': 85, 'excitement': 85, 'love': 90, 'gratitude': 85,
+        'contentment': 80, 'amusement': 80, 'acceptance': 75, 'enjoyment': 80,
+        'awe': 85, 'calmness': 75,
+
+        # Medium positive emotions (60-70)
+        'anticipation': 70, 'surprise': 65, 'empathy': 70,
+
+        # Neutral emotions (50-55)
+        'confusion': 50,
+
+        # Medium negative emotions (40-50)
+        'sadness': 40, 'disappointment': 45, 'envy': 40, 'shame': 35,
+
+        # High negative emotions (20-35)
+        'anger': 25, 'fear': 20, 'anxiety': 20, 'disgust': 30, 'contempt': 25,
+
+        # Special cases
+        'sleepy': 50,  # Low energy but not necessarily negative
+
+        # Legacy mappings for backward compatibility
         'happy': 90, 'calm': 70, 'neutral': 60,
         'sad': 40, 'angry': 30, 'stressed': 20
     }
