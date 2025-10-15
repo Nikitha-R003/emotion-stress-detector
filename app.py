@@ -125,13 +125,7 @@ def estimate_stress_level(emotion):
 def load_sentiment_model():
     return pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
 
-@st.cache_resource
-def load_stress_intensity_model():
-    # Using a general purpose model for stress intensity estimation
-    return pipeline("text-classification", model="microsoft/DialoGPT-medium")
-
 sentiment_model = load_sentiment_model()
-stress_intensity_model = load_stress_intensity_model()
 
 # Function to analyze sentiment polarity
 def analyze_sentiment(text):
