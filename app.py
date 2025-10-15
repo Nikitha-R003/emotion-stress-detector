@@ -16,32 +16,81 @@ from database import db_manager
 # Set page config at the very beginning
 st.set_page_config(page_title="AI Mental Wellness Companion", page_icon="🧠", layout="wide")
 
+# Custom CSS for light theme
+st.markdown("""
+<style>
+[data-testid="stAppViewContainer"] {
+    background-color: #ffffff;
+    color: #000000;
+}
+[data-testid="stSidebar"] {
+    background-color: #f8f9fa;
+    color: #000000;
+}
+[data-testid="stHeader"] {
+    background-color: #ffffff;
+}
+.stTextInput, .stTextArea, .stSelectbox, .stMultiselect {
+    background-color: #ffffff;
+    color: #000000;
+}
+.stButton button {
+    background-color: #007bff;
+    color: white;
+}
+.stSuccess, .stInfo, .stWarning, .stError {
+    background-color: #f8f9fa;
+    color: #000000;
+}
+</style>
+""", unsafe_allow_html=True)
+
 nltk.download('punkt', quiet=True)
 
 # Load the emotion detection model
 @st.cache_resource
 def load_emotion_model():
-    return pipeline("text-classification", model="bhadresh-savani/distilbert-base-uncased-emotion")
+    return pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
 
 emotion_model = load_emotion_model()
 
-# Function to detect emotion
+# Function to detect emotion and map to user-friendly labels
 def detect_emotion(text):
+    # Pre-check for sleepy/tired keywords
+    sleepy_keywords = ['sleepy', 'tired', 'exhausted', 'drowsy', 'fatigued', 'sleep', 'nap']
+    if any(keyword in text.lower() for keyword in sleepy_keywords):
+        return 'sleepy', 0.9
+
     result = emotion_model(text)
-    emotion = result[0]['label']
+    raw_emotion = result[0]['label']
     confidence = result[0]['score']
+
+    # Map model emotions to user-requested emotions
+    emotion_mapping = {
+        'joy': 'happy',
+        'sadness': 'sad',
+        'anger': 'angry',
+        'fear': 'stressed',  # Map fear to stressed
+        'surprise': 'surprised',  # Keep as surprised
+        'disgust': 'disgusted',  # Keep as disgusted
+        'neutral': 'calm'
+    }
+
+    emotion = emotion_mapping.get(raw_emotion.lower(), 'neutral')
     return emotion, confidence
 
 # Function to estimate stress level based on emotion
 def estimate_stress_level(emotion):
     stress_mapping = {
-        'joy': 'low',
-        'sadness': 'medium',
-        'anger': 'high',
-        'fear': 'high',
-        'surprise': 'medium',
-        'disgust': 'medium',
-        'neutral': 'low'
+        'happy': 'low',
+        'sad': 'medium',
+        'angry': 'high',
+        'stressed': 'high',
+        'neutral': 'medium',
+        'calm': 'low',
+        'sleepy': 'low',
+        'surprised': 'medium',
+        'disgusted': 'high'
     }
     return stress_mapping.get(emotion.lower(), 'medium')
 
@@ -67,10 +116,10 @@ def analyze_sentiment(text):
 
 # Function to calculate wellness score
 def calculate_wellness_score(emotion, stress_level, sentiment):
-    # Base scores
+    # Base scores - updated to match new emotion mapping
     emotion_scores = {
-        'joy': 90, 'neutral': 70, 'surprise': 60,
-        'sadness': 40, 'disgust': 30, 'anger': 20, 'fear': 10
+        'happy': 90, 'calm': 70, 'neutral': 60,
+        'sad': 40, 'angry': 30, 'stressed': 20
     }
 
     stress_scores = {'low': 80, 'medium': 50, 'high': 20}
@@ -98,13 +147,13 @@ def generate_insights(emotion, stress_level, sentiment, text):
     polarity = blob.sentiment.polarity
     subjectivity = blob.sentiment.subjectivity
 
-    if emotion.lower() == 'sadness' and polarity < -0.3:
+    if emotion.lower() == 'sad' and polarity < -0.3:
         insights.append("💙 Your words show deep sadness. Consider reaching out to a trusted friend or professional for support.")
-    elif emotion.lower() == 'anger' and stress_level == 'high':
+    elif emotion.lower() == 'angry' and stress_level == 'high':
         insights.append("🔥 High anger + high stress detected. Try the 4-7-8 breathing technique: inhale for 4 seconds, hold for 7, exhale for 8.")
-    elif emotion.lower() == 'fear' and subjectivity > 0.7:
+    elif emotion.lower() == 'stressed' and subjectivity > 0.7:
         insights.append("😨 Your writing shows anxious patterns. Grounding exercises might help - name 5 things you can see, 4 you can touch, etc.")
-    elif emotion.lower() == 'joy' and polarity > 0.5:
+    elif emotion.lower() == 'happy' and polarity > 0.5:
         insights.append("🎉 You're experiencing genuine happiness! This is great for mental wellness - try to note what contributed to this feeling.")
 
     if len(text.split()) < 10:
@@ -294,12 +343,12 @@ def check_authentication():
 def login_page():
     """Display login/signup page"""
     st.title("🧠 AI Mental Wellness Companion")
-    st.markdown("### Welcome! Please login or create an account")
+    st.markdown("### Ahoy there! Ready to embark on your emotional adventure?")
 
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
     with tab1:
-        st.markdown("### Login to your account")
+        st.markdown("### Welcome back, old friend!")
         login_username = st.text_input("Username", key="login_username")
         login_password = st.text_input("Password", type="password", key="login_password")
 
@@ -312,15 +361,15 @@ def login_page():
                     # Load user data from database
                     st.session_state.mood_history = db_manager.get_mood_history(user_id)
                     st.session_state.journal_entries = db_manager.get_journal_entries(user_id)
-                    st.success("✅ Login successful! Welcome back!")
+                    st.success("🎉 Welcome back, you magnificent human! Your emotional data awaits!")
                     st.rerun()
                 else:
-                    st.error("❌ Invalid username or password")
+                    st.error("🤔 Hmm, those credentials don't ring a bell. Double-check and try again?")
             else:
-                st.error("Please enter both username and password")
+                st.error("Hey, I need both username and password to let you in!")
 
     with tab2:
-        st.markdown("### Create a new account")
+        st.markdown("### Join the emotional intelligence revolution!")
         signup_username = st.text_input("Choose a username", key="signup_username")
         signup_password = st.text_input("Choose a password", type="password", key="signup_password")
         signup_confirm = st.text_input("Confirm password", type="password", key="signup_confirm")
@@ -328,20 +377,20 @@ def login_page():
         if st.button("Create Account"):
             if signup_username and signup_password and signup_confirm:
                 if signup_password != signup_confirm:
-                    st.error("Passwords don't match")
+                    st.error("🕵️ Passwords playing hide and seek? They need to match!")
                 elif len(signup_username) < 3:
-                    st.error("Username must be at least 3 characters long")
+                    st.error("Username too short! Aim for at least 3 characters - make it memorable!")
                 elif len(signup_password) < 6:
-                    st.error("Password must be at least 6 characters long")
+                    st.error("Password needs some muscle! At least 6 characters, please.")
                 elif db_manager.user_exists(signup_username):
-                    st.error("Username already exists. Please choose a different one.")
+                    st.error("That username's taken! Time for creative brainstorming...")
                 else:
                     if db_manager.create_user(signup_username, signup_password):
-                        st.success("✅ Account created successfully! Please login with your credentials.")
+                        st.success("🎊 Account created! You're officially part of the wellness squad. Login to begin!")
                     else:
-                        st.error("❌ Failed to create account. Please try again.")
+                        st.error("🤖 Oops! Account creation failed. The robots are having a bad day - try again?")
             else:
-                st.error("Please fill in all fields")
+                st.error("Fill 'er up! All fields are required for this emotional journey.")
 
 # Main app logic
 if not check_authentication():
@@ -371,26 +420,26 @@ else:
 
     # Home page
     if page == "Home":
-        st.title("🧠 AI Mental Wellness Companion")
-        st.markdown("### Your Personal AI-Powered Mental Health Companion")
+        st.title("🧠 Your Chill AI Wellness Buddy")
+        st.markdown("### Hey there! Ready to chat about how you're feeling?")
 
         col1, col2 = st.columns([2, 1])
 
         with col1:
             st.markdown("""
-            Welcome to your comprehensive mental wellness companion! This AI-powered app provides:
+            Welcome to your super-friendly mental wellness sidekick! We've got all the cool AI tools to help you understand and manage your emotions:
 
-            🎯 **Multi-Modal Analysis**: Emotion detection, sentiment analysis, and stress assessment
-            📊 **Progress Tracking**: Visual charts of your mood patterns over time
-            📝 **Therapeutic Journaling**: AI insights on your writing patterns
-            🛠️ **Wellness Tools**: Personalized coping strategies and mindfulness exercises
-            🎨 **Cheerful Interface**: Floating characters and friendly interactions
+            🎯 **Multi-Modal Analysis**: We detect emotions, check sentiment, and gauge stress levels
+            📊 **Progress Tracking**: See your mood patterns with fun charts over time
+            📝 **Therapeutic Journaling**: Write freely and get AI insights on your thoughts
+            🛠️ **Wellness Tools**: Get personalized coping strategies and chill exercises
+            🎨 **Cheerful Vibes**: Floating characters and friendly interactions to keep it light
 
-            **Getting Started:**
-            1. Go to "Mood Analysis" to analyze your current emotional state
-            2. Use "Journal" to write and get AI-powered insights
-            3. Check "Progress Dashboard" for trends and patterns
-            4. Explore "Wellness Tools" for coping strategies
+            **Let's Get Started:**
+            1. Head to "Mood Analysis" to spill the tea on how you're feeling
+            2. Try "Journal" to write and uncover some cool insights
+            3. Check out "Progress Dashboard" for your emotional journey trends
+            4. Explore "Wellness Tools" for tips to feel better
             """)
 
         with col2:
@@ -401,14 +450,14 @@ else:
                 st.metric("Most Common Emotion (Last 7)", most_common.capitalize())
                 st.metric("Total Entries", len(st.session_state.mood_history))
             else:
-                st.info("Start by analyzing your mood!")
+                st.info("Ready to dive in? Start by analyzing your mood!")
 
     # Mood Analysis page
     elif page == "Mood Analysis":
         st.title("🎭 Comprehensive Mood Analysis")
 
         # Input section
-        st.markdown("### Share how you're feeling")
+        st.markdown("### Spill the tea - how are you really feeling?")
         user_input = st.text_area(
             "Describe your day, thoughts, or emotions:",
             height=120,
@@ -503,7 +552,7 @@ else:
 
                     # Wellness interpretation
                     if wellness_score >= 80:
-                        st.success("🌟 Excellent mental wellness! You're in a great emotional state.")
+                        st.success("🌟 Excellent mental wellness! You're crushing it emotionally!")
                     elif wellness_score >= 60:
                         st.info("👍 Good mental wellness. Consider the coping strategies below.")
                     elif wellness_score >= 40:
@@ -520,7 +569,7 @@ else:
                         st.warning("💡 For high stress, try immediate interventions like deep breathing or stepping away from triggers.")
 
             else:
-                st.error("Please share your thoughts so I can analyze them!")
+                st.error("Hey, I need some words to work with! Share your thoughts so I can analyze them!")
 
     # Journal page
     elif page == "Journal":
@@ -552,7 +601,7 @@ else:
                     }
                     st.session_state.journal_entries.append(journal_entry)
 
-                st.success("Journal entry analyzed!")
+                st.success("Journal entry analyzed! You're doing great at self-reflection!")
 
                 col1, col2 = st.columns(2)
 
@@ -579,7 +628,7 @@ else:
                                 st.write("**AI Insights:**", entry['insights'][0])
 
         else:
-            st.error("Please write something in your journal!")
+            st.error("Hey, your journal is calling! Write something to get those insights flowing!")
 
     # Progress Dashboard
     elif page == "Progress Dashboard":
@@ -672,15 +721,15 @@ else:
             # Emotion timeline
             emotion_timeline = df.groupby('date')['emotion'].agg(lambda x: x.mode().iloc[0] if len(x) > 0 else 'neutral').reset_index()
             emotion_timeline['emotion_code'] = emotion_timeline['emotion'].map({
-                'joy': 5, 'neutral': 3, 'surprise': 4,
-                'sadness': 1, 'disgust': 2, 'anger': 0, 'fear': 0
+                'happy': 5, 'calm': 4, 'neutral': 3,
+                'sad': 1, 'angry': 0, 'stressed': 0
             })
 
             fig_emotion = px.line(emotion_timeline, x='date', y='emotion_code',
                                  title="Emotional Journey",
                                  labels={'emotion_code': 'Emotional State (Higher = More Positive)'})
-            fig_emotion.update_yaxes(tickvals=[0,1,2,3,4,5],
-                                    ticktext=['Anger/Fear', 'Sadness', 'Disgust', 'Neutral', 'Surprise', 'Joy'])
+            fig_emotion.update_yaxes(tickvals=[0,1,3,4,5],
+                                    ticktext=['Angry/Stressed', 'Sad', 'Neutral', 'Calm', 'Happy'])
             st.plotly_chart(fig_emotion, use_container_width=True)
 
             # Wellness score trend
