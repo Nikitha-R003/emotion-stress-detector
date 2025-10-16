@@ -401,107 +401,188 @@ else:
 
         # Voice input option using browser's SpeechRecognition API
         voice_enabled = st.checkbox("🎤 Enable Voice Input")
-
+        
         if voice_enabled:
+            # Display browser compatibility info
+            st.info("🎤 **Voice Input**: Works best in Chrome, Edge, or Opera browsers. Requires microphone permission.")
+            
+            # Voice recording button with improved JavaScript
             st.markdown("""
-            <div id="voice-input-container">
-                <button id="start-voice-btn" style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 10px 0;">
+            <div id="voice-container">
+                <button id="voice-btn" onclick="toggleVoiceRecording()" 
+                        style="background: linear-gradient(45deg, #4CAF50, #45a049); 
+                               color: white; border: none; padding: 15px 30px; 
+                               border-radius: 25px; cursor: pointer; font-size: 16px; 
+                               font-weight: bold; margin: 10px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                               transition: all 0.3s ease;">
                     🎤 Start Voice Recording
                 </button>
-                <div id="voice-status" style="margin: 10px 0; font-weight: bold;"></div>
-                <div id="voice-transcript" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; min-height: 40px; background-color: #f9f9f9;"></div>
+                <div id="voice-status" style="margin: 10px 0; font-weight: bold; color: #333;"></div>
+                <textarea id="voice-transcript" placeholder="Your speech will appear here..." 
+                         style="width: 100%; height: 100px; padding: 10px; border: 2px solid #ddd; 
+                                border-radius: 8px; font-family: inherit; resize: vertical;"></textarea>
+                <button id="use-transcript-btn" onclick="useTranscript()" 
+                        style="background: #2196F3; color: white; border: none; padding: 10px 20px; 
+                               border-radius: 5px; cursor: pointer; margin: 5px 0; display: none;">
+                    📝 Use This Transcript
+                </button>
             </div>
 
             <script>
             let recognition = null;
             let isRecording = false;
+            let finalTranscript = '';
+
+            function checkBrowserSupport() {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    document.getElementById('voice-status').innerHTML = 
+                        '❌ Speech recognition not supported. Please use Chrome, Edge, or Opera.';
+                    document.getElementById('voice-btn').disabled = true;
+                    document.getElementById('voice-btn').style.opacity = '0.5';
+                    return false;
+                }
+                return true;
+            }
 
             function initSpeechRecognition() {
-                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    recognition = new SpeechRecognition();
+                if (!checkBrowserSupport()) return;
+                
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+                recognition.maxAlternatives = 1;
 
-                    recognition.continuous = false;
-                    recognition.interimResults = true;
-                    recognition.lang = 'en-US';
+                recognition.onstart = function() {
+                    isRecording = true;
+                    finalTranscript = '';
+                    document.getElementById('voice-status').innerHTML = 
+                        '🎤 Listening... Speak clearly into your microphone.';
+                    document.getElementById('voice-btn').innerHTML = '⏹️ Stop Recording';
+                    document.getElementById('voice-btn').style.background = 'linear-gradient(45deg, #f44336, #d32f2f)';
+                    document.getElementById('use-transcript-btn').style.display = 'none';
+                };
 
-                    recognition.onstart = function() {
-                        isRecording = true;
-                        document.getElementById('voice-status').innerHTML = '🎤 Listening... Click "Stop Recording" when done.';
-                        document.getElementById('start-voice-btn').innerHTML = '⏹️ Stop Recording';
-                        document.getElementById('start-voice-btn').style.backgroundColor = '#f44336';
-                    };
-
-                    recognition.onresult = function(event) {
-                        let transcript = '';
-                        for (let i = event.resultIndex; i < event.results.length; i++) {
-                            transcript += event.results[i][0].transcript;
-                        }
-                        document.getElementById('voice-transcript').innerHTML = transcript;
-
-                        // Auto-submit if this is a final result
-                        if (event.results[event.results.length - 1].isFinal) {
-                            // Send the transcript to Streamlit
-                            const transcriptDiv = document.getElementById('voice-transcript');
-                            transcriptDiv.setAttribute('data-final-transcript', transcript);
-                            transcriptDiv.click(); // Trigger a custom event
-                        }
-                    };
-
-                    recognition.onerror = function(event) {
-                        document.getElementById('voice-status').innerHTML = '❌ Error: ' + event.error;
-                        resetVoiceButton();
-                    };
-
-                    recognition.onend = function() {
-                        isRecording = false;
-                        resetVoiceButton();
-                        const finalTranscript = document.getElementById('voice-transcript').innerHTML;
-                        if (finalTranscript.trim()) {
-                            document.getElementById('voice-status').innerHTML = '✅ Recording complete! Transcript ready.';
+                recognition.onresult = function(event) {
+                    let interimTranscript = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
                         } else {
-                            document.getElementById('voice-status').innerHTML = '⚠️ No speech detected. Try again.';
+                            interimTranscript += transcript;
                         }
-                    };
-                } else {
-                    document.getElementById('voice-status').innerHTML = '❌ Speech recognition not supported in this browser.';
-                    document.getElementById('start-voice-btn').disabled = true;
-                }
+                    }
+                    
+                    document.getElementById('voice-transcript').value = finalTranscript + interimTranscript;
+                    
+                    if (event.results[event.results.length - 1].isFinal) {
+                        document.getElementById('voice-status').innerHTML = 
+                            '✅ Recording complete! Review and edit if needed.';
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    let errorMsg = '❌ Error: ';
+                    switch(event.error) {
+                        case 'no-speech':
+                            errorMsg += 'No speech detected. Try speaking louder.';
+                            break;
+                        case 'audio-capture':
+                            errorMsg += 'Microphone not found. Check your microphone.';
+                            break;
+                        case 'not-allowed':
+                            errorMsg += 'Microphone permission denied. Please allow microphone access.';
+                            break;
+                        case 'network':
+                            errorMsg += 'Network error. Check your internet connection.';
+                            break;
+                        default:
+                            errorMsg += event.error;
+                    }
+                    document.getElementById('voice-status').innerHTML = errorMsg;
+                    resetVoiceButton();
+                };
+
+                recognition.onend = function() {
+                    isRecording = false;
+                    resetVoiceButton();
+                    
+                    if (finalTranscript.trim()) {
+                        document.getElementById('voice-status').innerHTML = 
+                            '✅ Ready! Click "Use This Transcript" to analyze.';
+                        document.getElementById('use-transcript-btn').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('voice-status').innerHTML = 
+                            '⚠️ No speech detected. Try speaking more clearly.';
+                    }
+                };
             }
 
             function resetVoiceButton() {
-                const btn = document.getElementById('start-voice-btn');
+                const btn = document.getElementById('voice-btn');
                 btn.innerHTML = '🎤 Start Voice Recording';
-                btn.style.backgroundColor = '#4CAF50';
+                btn.style.background = 'linear-gradient(45deg, #4CAF50, #45a049)';
             }
 
-            function toggleRecording() {
+            function toggleVoiceRecording() {
                 if (!recognition) {
                     initSpeechRecognition();
+                    if (!recognition) return; // Check if initialization failed
                 }
 
                 if (isRecording) {
                     recognition.stop();
                 } else {
+                    finalTranscript = '';
+                    document.getElementById('voice-transcript').value = '';
                     recognition.start();
                 }
             }
 
-            // Initialize on page load
-            document.addEventListener('DOMContentLoaded', function() {
-                initSpeechRecognition();
-                document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
-            });
+            function useTranscript() {
+                const transcript = document.getElementById('voice-transcript').value.trim();
+                if (transcript) {
+                    // Create a hidden input to pass the transcript to Streamlit
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'voice_transcript';
+                    input.value = transcript;
+                    input.id = 'voice_transcript_input';
+                    
+                    // Remove existing input if any
+                    const existing = document.getElementById('voice_transcript_input');
+                    if (existing) existing.remove();
+                    
+                    // Add to form and trigger form submission
+                    document.body.appendChild(input);
+                    
+                    // Update the main text area
+                    const mainTextArea = document.querySelector('textarea[data-testid="stTextArea"]');
+                    if (mainTextArea) {
+                        mainTextArea.value = transcript;
+                        mainTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    
+                    document.getElementById('voice-status').innerHTML = 
+                        '📝 Transcript copied to analysis box!';
+                    
+                    // Scroll to analysis button
+                    setTimeout(() => {
+                        const analyzeBtn = document.querySelector('button[kind="primary"]');
+                        if (analyzeBtn) analyzeBtn.scrollIntoView({ behavior: 'smooth' });
+                    }, 500);
+                }
+            }
 
-            // Fallback for dynamic loading
+            // Initialize when page loads
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() {
-                    initSpeechRecognition();
-                    document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
-                });
+                document.addEventListener('DOMContentLoaded', checkBrowserSupport);
             } else {
-                initSpeechRecognition();
-                document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
+                checkBrowserSupport();
             }
             </script>
             """, unsafe_allow_html=True)
@@ -515,6 +596,20 @@ else:
                 help="Your spoken words will appear here. You can edit them before analysis."
             )
 
+            # Alternative voice input using st.audio for file upload
+            st.markdown("---")
+            st.markdown("**Alternative: Upload Audio File**")
+            audio_file = st.file_uploader(
+                "Upload an audio file (.wav, .mp3, .m4a)",
+                type=['wav', 'mp3', 'm4a', 'ogg'],
+                help="Upload an audio recording of your thoughts/feelings",
+                key="audio_upload"
+            )
+            
+            if audio_file:
+                st.audio(audio_file, format='audio/wav')
+                st.info("🎤 Audio uploaded! Please type what you said in the text box above for analysis.")
+            
             # Button to copy transcript to main input
             if voice_transcript.strip():
                 if st.button("📝 Use This Transcript", key="use_transcript"):
