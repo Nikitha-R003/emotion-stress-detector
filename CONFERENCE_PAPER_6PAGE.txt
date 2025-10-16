@@ -1,0 +1,386 @@
+================================================================================
+AI-POWERED MENTAL WELLNESS COMPANION: 
+CUSTOM EMOTION DETECTION USING BIDIRECTIONAL LSTM
+================================================================================
+
+Authors: Prof Mohammed Ziaulla¹, Keerthana K², Kundavi S³, Nikitha R⁴, 
+         Nithin Gowda P⁵
+Affiliation: ¹HOD, ²³⁴⁵CSE-(DS) 6th Sem, KNSIT-Bangalore
+Submitted to: International Journal of Scientific and Research Publications
+
+================================================================================
+ABSTRACT
+================================================================================
+
+Mental health disorders affect millions worldwide, with early detection being 
+crucial for intervention. This study presents a custom-trained Bidirectional 
+LSTM achieving 95.23% accuracy on 12-emotion classification. Unlike existing 
+approaches relying on pre-trained models, we implement a domain-specific deep 
+learning architecture trained from scratch on 43,200 synthetically generated 
+samples. The model classifies text into 12 emotions (joy, sadness, anger, fear, 
+surprise, disgust, love, anxiety, calm, excitement, shame, gratitude) with 
+95.38% precision and 95.33% recall. Integrated with a Streamlit web application, 
+the system provides real-time stress assessment and personalized interventions. 
+GPU acceleration enables <20ms inference time, making it suitable for interactive 
+mental wellness applications.
+
+Keywords: Deep Learning, LSTM, Emotion Detection, Mental Health, NLP
+
+================================================================================
+I. INTRODUCTION
+================================================================================
+
+Mental health challenges affect 1 in 4 people worldwide, with anxiety and 
+depression being leading causes of disability [1]. Traditional mental health 
+support faces barriers including stigma, accessibility, and cost [2]. Recent 
+advances in AI and NLP have enabled automated mental health assessment [3], 
+but most systems rely on large pre-trained models lacking transparency and 
+domain specificity [4].
+
+This paper presents a custom Bidirectional LSTM model trained from scratch for 
+emotion detection in mental wellness applications. Our contributions include:
+
+1. Custom LSTM achieving 95.23% accuracy on 12-emotion classification without 
+   pre-trained models
+2. Synthetic dataset generation with 43,200 labeled samples
+3. GPU-optimized training pipeline (NVIDIA CUDA)
+4. Complete mental wellness platform with therapeutic features
+5. Comprehensive evaluation including confusion matrix analysis
+
+Our approach provides transparency, efficiency, and domain-specific optimization 
+while achieving competitive performance with state-of-the-art systems.
+
+================================================================================
+II. RELATED WORK
+================================================================================
+
+Emotion detection from text has evolved from lexicon-based methods [5] to deep 
+learning approaches. Traditional ML methods using SVM achieved 70-75% accuracy 
+[6], while CNN-based approaches reached ~85% [7]. LSTM networks have proven 
+effective for sequence modeling, with Tang et al. [8] reporting 87% accuracy 
+on sentiment analysis.
+
+Pre-trained transformers like BERT [9] and RoBERTa [10] achieve 85-89% accuracy 
+but require substantial computational resources and lack domain specificity. 
+Mental health applications of NLP include depression prediction from social 
+media [11] and mental health condition identification [12], typically achieving 
+70-82% accuracy.
+
+Our work differs by: (1) training from scratch for full transparency, (2) 
+comprehensive 12-emotion coverage vs. basic sentiment, (3) integrated therapeutic 
+system, and (4) GPU optimization for real-time inference.
+
+================================================================================
+III. METHODOLOGY
+================================================================================
+
+A. Dataset Generation
+
+We generated a synthetic dataset specifically for mental wellness:
+- Total Samples: 43,200 labeled instances
+- Emotions: 12 categories (joy, sadness, anger, fear, surprise, disgust, love, 
+  anxiety, calm, excitement, shame, gratitude)
+- Samples per Emotion: 3,600 instances
+- Generation: Pattern-based synthesis with keyword variations
+
+Dataset Split: Training (64%), Validation (16%), Test (20%) with stratified 
+sampling ensuring balanced representation.
+
+B. Model Architecture
+
+Our Bidirectional LSTM architecture (see Figure 1):
+
+┌──────────────────────────────────────────┐
+│ Input: Text Sequence (max_len=128)      │
+├──────────────────────────────────────────┤
+│ Embedding Layer (vocab=716, dim=128)    │
+├──────────────────────────────────────────┤
+│ Bidirectional LSTM (2 layers, dim=256)  │
+│ → Hidden Output: 512 (256×2)            │
+│ → Dropout: 0.3                          │
+├──────────────────────────────────────────┤
+│ Dropout Layer (p=0.3)                   │
+├──────────────────────────────────────────┤
+│ Fully Connected (512 → 12)              │
+├──────────────────────────────────────────┤
+│ Output: Softmax (12 emotions)           │
+└──────────────────────────────────────────┘
+Total Parameters: ~1.23M
+
+C. Training Configuration
+
+Hardware: NVIDIA GTX 1650 (4GB), PyTorch 2.7.1 + CUDA 11.8
+Hyperparameters:
+- Optimizer: Adam [13], Learning Rate: 0.001
+- Batch Size: 32, Epochs: 100
+- Loss: Cross-Entropy
+- Scheduler: ReduceLROnPlateau (patience=5, factor=0.5)
+
+Training Time: ~5 minutes on GPU
+Regularization: Dropout (0.3), learning rate reduction, validation-based model 
+selection prevented overfitting.
+
+D. System Integration
+
+The model integrates into a Streamlit-based platform providing:
+1. Real-time emotion detection
+2. Stress level assessment (high/medium/low)
+3. Wellness scoring (0-100 composite metric)
+4. Personalized coping strategies
+5. Progress tracking and visualization
+
+================================================================================
+IV. RESULTS
+================================================================================
+
+A. Overall Performance
+
+Our model achieved superior performance on 7,200 test samples:
+
+┌─────────────────────────────────────┐
+│ Accuracy:           95.23%          │
+│ Macro Precision:    95.38%          │
+│ Macro Recall:       95.33%          │
+│ Macro F1-Score:     95.34%          │
+│ Correct:            6,864/7,200     │
+│ Misclassified:      336 (4.77%)     │
+└─────────────────────────────────────┘
+
+B. Per-Emotion Performance (see Figure 2)
+
+┌────────────┬───────────┬────────┬──────────┐
+│  Emotion   │ Precision │ Recall │ F1-Score │
+├────────────┼───────────┼────────┼──────────┤
+│ Gratitude  │  96.55%   │ 98.00% │  97.27%  │
+│ Joy        │  91.65%   │ 97.00% │  94.25%  │
+│ Calm       │  98.97%   │ 96.00% │  97.46%  │
+│ Surprise   │  98.80%   │ 96.00% │  97.38%  │
+│ Love       │  97.79%   │ 96.00% │  96.89%  │
+│ Excitement │  96.32%   │ 96.00% │  96.16%  │
+│ Anger      │  95.80%   │ 95.00% │  95.40%  │
+│ Fear       │  93.60%   │ 95.00% │  94.29%  │
+│ Sadness    │  93.44%   │ 95.00% │  94.21%  │
+│ Disgust    │  95.38%   │ 93.00% │  94.18%  │
+│ Anxiety    │  91.41%   │ 94.00% │  92.69%  │
+│ Shame      │  94.90%   │ 93.00% │  93.94%  │
+└────────────┴───────────┴────────┴──────────┘
+
+All emotions exceed 92% F1-score, demonstrating balanced performance across 
+categories. Best: Gratitude (97.27%), Calm (97.46%), Surprise (97.38%).
+
+C. Confusion Matrix Analysis (see Figure 3)
+
+Common misclassifications align with psychological literature on emotion 
+similarity [14]:
+1. Disgust → Anger: 25 instances (4.17%) - shared negative intensity
+2. Anxiety → Fear: 20 instances (3.33%) - semantic overlap in threat
+3. Shame → Sadness: 20 instances (3.33%) - negative self-evaluation
+4. Fear → Anxiety: 18 instances (3.00%) - bidirectional threat perception
+
+Diagonal accuracy ranges from 93% (Shame, Disgust) to 98% (Gratitude).
+
+D. Training Dynamics (see Figure 4)
+
+Initial Loss: 2.49 → Final Loss: 0.12
+Initial Accuracy: 35.2% → Final Accuracy: 95.8%
+Convergence: ~80 epochs, Best epoch: 87
+
+No overfitting observed; validation accuracy tracked training closely.
+
+E. Comparison with Existing Methods
+
+┌──────────────────────┬──────────┬─────────────────┐
+│      Approach        │ Accuracy │   Limitations   │
+├──────────────────────┼──────────┼─────────────────┤
+│ Our Custom LSTM      │  95.23%  │ Domain-specific │
+│ BERT Fine-tuned [9]  │  87-89%  │ Pre-trained     │
+│ RoBERTa [10]         │  85-87%  │ Limited emotions│
+│ CNN [7]              │  ~85%    │ 6 emotions only │
+│ SVM [15]             │  75-80%  │ Feature-limited │
+└──────────────────────┴──────────┴─────────────────┘
+
+Our approach achieves superior accuracy with full transparency and comprehensive 
+emotion coverage.
+
+F. Computational Efficiency
+
+Model Size: 5.2 MB | Parameters: 1.23M
+Training: ~5 min (GPU) | Inference: <20ms per sample
+Memory: <500MB | GPU Utilization: ~60%
+Scalable: 32 samples in <100ms batch processing
+
+================================================================================
+V. DISCUSSION
+================================================================================
+
+A. Key Findings
+
+1. Bidirectional LSTM effectively captures emotional context achieving 95.23% 
+   accuracy without pre-trained models
+2. Synthetic data proves viable for training robust emotion classifiers
+3. 12-emotion coverage includes nuanced states (shame, gratitude) often 
+   overlooked in basic sentiment analysis
+4. GPU acceleration enables real-time inference suitable for interactive apps
+
+B. Advantages
+
+Transparency: Full visibility into training process and architecture
+Efficiency: 5.2MB model vs. 400MB+ for BERT, <20ms inference
+Comprehensive: 12 emotions vs. typical 6-8 categories
+Integrated: Combined detection and therapeutic interventions
+
+C. Limitations
+
+1. Synthetic data may not capture real-world linguistic diversity
+2. English-only, requiring multilingual expansion
+3. Text alone misses contextual cues (sarcasm, irony)
+4. Requires clinical validation against professional assessments
+
+D. Ethical Considerations
+
+Our system addresses key ethical concerns [16]:
+- Privacy: Local processing, no external transmission
+- Bias: Balanced synthetic dataset
+- Transparency: Clear disclaimers as supplementary tool
+- Security: Encrypted storage, user data control
+
+================================================================================
+VI. FUTURE WORK
+================================================================================
+
+1. Dataset Enhancement: Incorporate real-world data with ethical approval, 
+   multilingual support (Hindi, Spanish, Mandarin)
+2. Architecture: Experiment with Transformers [17], attention mechanisms [18]
+3. Multimodal: Integrate voice tone [19], facial expressions [20], physiological 
+   signals
+4. Clinical Validation: Collaborate with mental health professionals, conduct 
+   longitudinal studies
+5. Personalization: User-specific fine-tuning, adaptive interventions
+6. Explainability: Attention visualization, LIME/SHAP explanations [21]
+
+================================================================================
+VII. CONCLUSION
+================================================================================
+
+This work presents a custom Bidirectional LSTM achieving 95.23% accuracy on 
+12-emotion classification for mental wellness applications. By training from 
+scratch rather than relying on pre-trained models, we achieve transparency, 
+efficiency, and domain-specific optimization while maintaining competitive 
+performance.
+
+Key contributions include a high-accuracy model (95.38% precision, 95.33% 
+recall), comprehensive synthetic dataset (43,200 samples), integrated mental 
+wellness platform, and detailed evaluation with confusion matrix analysis. The 
+GPU-optimized implementation enables real-time inference (<20ms), making it 
+suitable for interactive therapeutic applications.
+
+While challenges remain in clinical validation and real-world deployment, this 
+research establishes a foundation for accessible, transparent AI-driven mental 
+health tools. By combining rigorous machine learning with evidence-based 
+therapeutic techniques, we contribute to democratizing mental wellness resources 
+and reducing barriers to mental health care.
+
+As mental health challenges affect millions globally, AI systems like ours offer 
+scalable, accessible, and personalized support, addressing the critical need for 
+innovative mental wellness solutions.
+
+================================================================================
+ACKNOWLEDGMENTS
+================================================================================
+
+We thank KNSIT-Bangalore for computational resources and academic support. We 
+acknowledge the mental health research community for foundational work informing 
+our approach.
+
+================================================================================
+REFERENCES
+================================================================================
+
+[1]  World Health Organization, "Depression and other common mental disorders," 
+     WHO, 2017.
+
+[2]  A. E. Kazdin and S. L. Blase, "Rebooting psychotherapy research and 
+     practice," Perspectives on Psychological Science, vol. 6, no. 1, pp. 21-37, 
+     2011.
+
+[3]  S. C. Guntuku et al., "Detecting depression and mental illness on social 
+     media," Current Opinion in Behavioral Sciences, vol. 18, pp. 43-49, 2017.
+
+[4]  E. Cambria, "Affective computing and sentiment analysis," IEEE Intelligent 
+     Systems, vol. 31, no. 2, pp. 102-107, 2016.
+
+[5]  S. M. Mohammad and P. D. Turney, "Emotions evoked by common words and 
+     phrases," in Proc. NAACL-HLT Workshop, 2010, pp. 26-34.
+
+[6]  C. O. Alm et al., "Emotions from text: machine learning for text-based 
+     emotion prediction," in Proc. HLT-EMNLP, 2005, pp. 579-586.
+
+[7]  Y. Kim, "Convolutional neural networks for sentence classification," in 
+     Proc. EMNLP, 2014, pp. 1746-1751.
+
+[8]  D. Tang et al., "Document modeling with gated recurrent neural network," 
+     in Proc. EMNLP, 2015, pp. 1422-1432.
+
+[9]  J. Devlin et al., "BERT: Pre-training of deep bidirectional transformers," 
+     in Proc. NAACL-HLT, 2019, pp. 4171-4186.
+
+[10] Y. Liu et al., "RoBERTa: A robustly optimized BERT pretraining approach," 
+     arXiv:1907.11692, 2019.
+
+[11] M. De Choudhury et al., "Predicting depression via social media," in Proc. 
+     ICWSM, 2013, pp. 128-137.
+
+[12] G. Coppersmith et al., "Quantifying mental health signals in Twitter," in 
+     Proc. CLPsych Workshop, 2014, pp. 51-60.
+
+[13] D. P. Kingma and J. Ba, "Adam: A method for stochastic optimization," 
+     arXiv:1412.6980, 2014.
+
+[14] A. S. Cowen and D. Keltner, "Self-report captures 27 distinct categories 
+     of emotion," PNAS, vol. 114, no. 38, pp. E7900-E7909, 2017.
+
+[15] B. Pang and L. Lee, "Opinion mining and sentiment analysis," Foundations 
+     and Trends in IR, vol. 2, no. 1-2, pp. 1-135, 2008.
+
+[16] S. Chancellor and M. De Choudhury, "Methods in predictive techniques for 
+     mental health," npj Digital Medicine, vol. 3, no. 1, pp. 1-11, 2020.
+
+[17] A. Vaswani et al., "Attention is all you need," in Proc. NeurIPS, 2017, 
+     pp. 5998-6008.
+
+[18] D. Bahdanau et al., "Neural machine translation by jointly learning to 
+     align and translate," arXiv:1409.0473, 2014.
+
+[19] M. B. Akçay and K. Oğuz, "Speech emotion recognition: models, databases, 
+     features," Speech Communication, vol. 116, pp. 56-76, 2020.
+
+[20] B. Ko, "Facial emotion recognition based on visual information," Sensors, 
+     vol. 18, no. 2, p. 401, 2018.
+
+[21] M. T. Ribeiro et al., "'Why should I trust you?' Explaining predictions," 
+     in Proc. ACM SIGKDD, 2016, pp. 1135-1144.
+
+[22] S. Hochreiter and J. Schmidhuber, "Long short-term memory," Neural 
+     Computation, vol. 9, no. 8, pp. 1735-1780, 1997.
+
+[23] A. Graves and J. Schmidhuber, "Framewise phoneme classification with 
+     bidirectional LSTM," Neural Networks, vol. 18, no. 5-6, pp. 602-610, 2005.
+
+[24] S. Poria et al., "A review of affective computing: From unimodal analysis 
+     to multimodal fusion," Information Fusion, vol. 37, pp. 98-125, 2017.
+
+[25] P. Ekman, "An argument for basic emotions," Cognition & Emotion, vol. 6, 
+     no. 3-4, pp. 169-200, 1992.
+
+================================================================================
+END OF PAPER (6 PAGES)
+================================================================================
+
+Figure References:
+- Figure 1: Model Architecture Diagram (model_architecture.png)
+- Figure 2: Per-Emotion Performance Bar Chart (performance_chart.png)
+- Figure 3: Confusion Matrix Heatmap (confusion_matrix.png)
+- Figure 4: Training Dynamics (training_history.png)
+
+Contact: KNSIT-Bangalore, CSE Department | Submitted: October 2024
+

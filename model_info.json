@@ -1,0 +1,35 @@
+{
+  "vocab_size": 716,
+  "num_classes": 12,
+  "accuracy": 0.9523,
+  "model_type": "LSTM",
+  "label_encoder_classes": [
+    "anger",
+    "anxiety",
+    "calm",
+    "disgust",
+    "excitement",
+    "fear",
+    "gratitude",
+    "joy",
+    "love",
+    "sadness",
+    "shame",
+    "surprise"
+  ],
+  "emotions": [
+    "anger",
+    "anxiety",
+    "calm",
+    "disgust",
+    "excitement",
+    "fear",
+    "gratitude",
+    "joy",
+    "love",
+    "sadness",
+    "shame",
+    "surprise"
+  ],
+  "vocab": {}
+}
