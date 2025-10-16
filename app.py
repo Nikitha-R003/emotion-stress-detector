@@ -1,5 +1,4 @@
 import streamlit as st
-from transformers import pipeline
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -12,6 +11,7 @@ from textblob import TextBlob
 import nltk
 import streamlit.components.v1 as components
 from database import db_manager
+from custom_emotion_model import detect_emotion, analyze_sentiment, estimate_stress_level, calculate_wellness_score, initialize_models
 
 # Set page config at the very beginning
 st.set_page_config(page_title="AI Mental Wellness Companion", page_icon="🧠", layout="wide")
@@ -47,137 +47,31 @@ st.markdown("""
 
 nltk.download('punkt', quiet=True)
 
-# Load the emotion detection model (zero-shot classification for broader emotion coverage)
+# Initialize custom models
 @st.cache_resource
-def load_emotion_model():
-    with st.spinner("🤖 Loading AI emotion detection model... This may take a moment on first run."):
-        return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+def load_custom_models():
+    with st.spinner("🤖 Loading custom trained emotion detection model... This may take a moment on first run."):
+        success = initialize_models()
+        if success:
+            st.success("✅ Custom models loaded successfully!")
+        else:
+            st.warning("⚠️ Using fallback rule-based detection")
+        return success
 
-emotion_model = load_emotion_model()
+# Load models
+model_loaded = load_custom_models()
 
-# Define all 24 emotions for classification
-ALL_EMOTIONS = [
-    "Anger", "Fear", "Sadness", "Disgust", "Happiness", "Anxiety", "Envy", "Excitement",
-    "Love", "Shame", "Disappointment", "Surprise", "AWE", "Calmness", "Confusion",
-    "Empathy", "Enjoyment", "Gratitude", "Joy", "Acceptance", "Amusement", "Anticipation",
-    "Contempt", "Contentment"
+# Define core emotions for classification (12 emotions)
+CORE_EMOTIONS = [
+    "joy", "sadness", "anger", "fear", "surprise", "disgust",
+    "love", "anxiety", "calm", "excitement", "shame", "gratitude"
 ]
 
-# Function to detect emotion and map to user-friendly labels
-def detect_emotion(text):
-    # Pre-check for sleepy/tired keywords
-    sleepy_keywords = ['sleepy', 'tired', 'exhausted', 'drowsy', 'fatigued', 'sleep', 'nap']
-    if any(keyword in text.lower() for keyword in sleepy_keywords):
-        return 'sleepy', 0.9
+# Function to estimate stress level based on emotion (now imported from custom_emotion_model)
 
-    # Use zero-shot classification with all 24 emotions
-    result = emotion_model(text, ALL_EMOTIONS, multi_label=False)
-    emotion = result['labels'][0]  # Get the top prediction
-    confidence = result['scores'][0]
+# Sentiment analysis is now handled by custom_emotion_model
 
-    # Normalize emotion name (remove any extra spaces, make lowercase for consistency)
-    emotion = emotion.strip().lower()
-
-    return emotion, confidence
-
-# Function to estimate stress level based on emotion
-def estimate_stress_level(emotion):
-    stress_mapping = {
-        'anger': 'high',
-        'fear': 'high',
-        'sadness': 'medium',
-        'disgust': 'high',
-        'happiness': 'low',
-        'anxiety': 'high',
-        'envy': 'medium',
-        'excitement': 'low',
-        'love': 'low',
-        'shame': 'high',
-        'disappointment': 'medium',
-        'surprise': 'medium',
-        'awe': 'low',
-        'calmness': 'low',
-        'confusion': 'medium',
-        'empathy': 'low',
-        'enjoyment': 'low',
-        'gratitude': 'low',
-        'joy': 'low',
-        'acceptance': 'low',
-        'amusement': 'low',
-        'anticipation': 'medium',
-        'contempt': 'high',
-        'contentment': 'low',
-        # Legacy mappings for backward compatibility
-        'happy': 'low',
-        'sad': 'medium',
-        'angry': 'high',
-        'stressed': 'high',
-        'neutral': 'medium',
-        'calm': 'low',
-        'sleepy': 'low',
-        'surprised': 'medium',
-        'disgusted': 'high'
-    }
-    return stress_mapping.get(emotion.lower(), 'medium')
-
-# Additional AI models for comprehensive analysis
-@st.cache_resource
-def load_sentiment_model():
-    return pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
-
-sentiment_model = load_sentiment_model()
-
-# Function to analyze sentiment polarity
-def analyze_sentiment(text):
-    result = sentiment_model(text)
-    sentiment = result[0]['label']
-    confidence = result[0]['score']
-    return sentiment, confidence
-
-# Function to calculate wellness score
-def calculate_wellness_score(emotion, stress_level, sentiment):
-    # Base scores for all 24 emotions
-    emotion_scores = {
-        # High positive emotions (80-90)
-        'happiness': 90, 'joy': 85, 'excitement': 85, 'love': 90, 'gratitude': 85,
-        'contentment': 80, 'amusement': 80, 'acceptance': 75, 'enjoyment': 80,
-        'awe': 85, 'calmness': 75,
-
-        # Medium positive emotions (60-70)
-        'anticipation': 70, 'surprise': 65, 'empathy': 70,
-
-        # Neutral emotions (50-55)
-        'confusion': 50,
-
-        # Medium negative emotions (40-50)
-        'sadness': 40, 'disappointment': 45, 'envy': 40, 'shame': 35,
-
-        # High negative emotions (20-35)
-        'anger': 25, 'fear': 20, 'anxiety': 20, 'disgust': 30, 'contempt': 25,
-
-        # Special cases
-        'sleepy': 50,  # Low energy but not necessarily negative
-
-        # Legacy mappings for backward compatibility
-        'happy': 90, 'calm': 70, 'neutral': 60,
-        'sad': 40, 'angry': 30, 'stressed': 20
-    }
-
-    stress_scores = {'low': 80, 'medium': 50, 'high': 20}
-
-    sentiment_scores = {
-        'LABEL_2': 90,  # Positive
-        'LABEL_1': 50,  # Neutral
-        'LABEL_0': 20   # Negative
-    }
-
-    emotion_score = emotion_scores.get(emotion.lower(), 50)
-    stress_score = stress_scores.get(stress_level, 50)
-    sentiment_score = sentiment_scores.get(sentiment, 50)
-
-    # Weighted average
-    wellness_score = (emotion_score * 0.4 + stress_score * 0.4 + sentiment_score * 0.2)
-    return round(wellness_score, 1)
+# Wellness score calculation is now handled by custom_emotion_model
 
 # Function to generate personalized insights
 def generate_insights(emotion, stress_level, sentiment, text):
@@ -505,9 +399,130 @@ else:
             placeholder="e.g., I had a stressful meeting today and I'm feeling overwhelmed..."
         )
 
-        # Voice input option (placeholder for future implementation)
-        if st.checkbox("🎤 Enable Voice Input (Coming Soon)"):
-            st.info("Voice-to-text integration will be available in the next update!")
+        # Voice input option using browser's SpeechRecognition API
+        voice_enabled = st.checkbox("🎤 Enable Voice Input")
+
+        if voice_enabled:
+            st.markdown("""
+            <div id="voice-input-container">
+                <button id="start-voice-btn" style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 10px 0;">
+                    🎤 Start Voice Recording
+                </button>
+                <div id="voice-status" style="margin: 10px 0; font-weight: bold;"></div>
+                <div id="voice-transcript" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; min-height: 40px; background-color: #f9f9f9;"></div>
+            </div>
+
+            <script>
+            let recognition = null;
+            let isRecording = false;
+
+            function initSpeechRecognition() {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    recognition = new SpeechRecognition();
+
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+                    recognition.lang = 'en-US';
+
+                    recognition.onstart = function() {
+                        isRecording = true;
+                        document.getElementById('voice-status').innerHTML = '🎤 Listening... Click "Stop Recording" when done.';
+                        document.getElementById('start-voice-btn').innerHTML = '⏹️ Stop Recording';
+                        document.getElementById('start-voice-btn').style.backgroundColor = '#f44336';
+                    };
+
+                    recognition.onresult = function(event) {
+                        let transcript = '';
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            transcript += event.results[i][0].transcript;
+                        }
+                        document.getElementById('voice-transcript').innerHTML = transcript;
+
+                        // Auto-submit if this is a final result
+                        if (event.results[event.results.length - 1].isFinal) {
+                            // Send the transcript to Streamlit
+                            const transcriptDiv = document.getElementById('voice-transcript');
+                            transcriptDiv.setAttribute('data-final-transcript', transcript);
+                            transcriptDiv.click(); // Trigger a custom event
+                        }
+                    };
+
+                    recognition.onerror = function(event) {
+                        document.getElementById('voice-status').innerHTML = '❌ Error: ' + event.error;
+                        resetVoiceButton();
+                    };
+
+                    recognition.onend = function() {
+                        isRecording = false;
+                        resetVoiceButton();
+                        const finalTranscript = document.getElementById('voice-transcript').innerHTML;
+                        if (finalTranscript.trim()) {
+                            document.getElementById('voice-status').innerHTML = '✅ Recording complete! Transcript ready.';
+                        } else {
+                            document.getElementById('voice-status').innerHTML = '⚠️ No speech detected. Try again.';
+                        }
+                    };
+                } else {
+                    document.getElementById('voice-status').innerHTML = '❌ Speech recognition not supported in this browser.';
+                    document.getElementById('start-voice-btn').disabled = true;
+                }
+            }
+
+            function resetVoiceButton() {
+                const btn = document.getElementById('start-voice-btn');
+                btn.innerHTML = '🎤 Start Voice Recording';
+                btn.style.backgroundColor = '#4CAF50';
+            }
+
+            function toggleRecording() {
+                if (!recognition) {
+                    initSpeechRecognition();
+                }
+
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            }
+
+            // Initialize on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                initSpeechRecognition();
+                document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
+            });
+
+            // Fallback for dynamic loading
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    initSpeechRecognition();
+                    document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
+                });
+            } else {
+                initSpeechRecognition();
+                document.getElementById('start-voice-btn').addEventListener('click', toggleRecording);
+            }
+            </script>
+            """, unsafe_allow_html=True)
+
+            # Get the voice transcript if available
+            voice_transcript = st.text_area(
+                "Voice Transcript (edit if needed):",
+                value="",
+                key="voice_transcript",
+                height=80,
+                help="Your spoken words will appear here. You can edit them before analysis."
+            )
+
+            # Button to copy transcript to main input
+            if voice_transcript.strip():
+                if st.button("📝 Use This Transcript", key="use_transcript"):
+                    # Update the main text area with the voice transcript
+                    st.session_state.user_input = voice_transcript
+                    st.success("✅ Transcript copied to main input area!")
+                    st.rerun()
+                st.info("🎤 Voice input detected! Click 'Use This Transcript' to copy it to the main input area above.")
 
         if st.button("🔍 Analyze My Emotional State", type="primary"):
             if user_input.strip():
