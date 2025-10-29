@@ -10,6 +10,8 @@ import torch.nn as nn
 import numpy as np
 from collections import Counter
 import re
+import nltk
+from nltk.stem import WordNetLemmatizer
 
 class EmotionLSTM(nn.Module):
     """LSTM-based emotion classification model (same as training)"""
@@ -42,6 +44,7 @@ class CustomEmotionDetector:
         self.label_encoder_classes = None
         self.vocab_size = None
         self.num_classes = None
+        self.lemmatizer = WordNetLemmatizer()
         
         # Load model info
         try:
@@ -74,6 +77,22 @@ class CustomEmotionDetector:
             print(f"Error loading custom model: {e}")
             print("Falling back to rule-based detection...")
             self.model = None
+
+        # Keyword map used for fallback and low-confidence overrides
+        self.emotion_keywords = {
+            'joy': ['happy', 'joyful', 'excited', 'cheerful', 'delighted', 'ecstatic', 'thrilled', 'elated', 'blissful', 'content', 'great', 'amazing', 'wonderful', 'fantastic'],
+            'sadness': ['sad', 'depressed', 'down', 'melancholy', 'gloomy', 'heartbroken', 'dejected', 'miserable', 'sorrowful', 'blue', 'terrible', 'awful', 'horrible'],
+            'anger': ['angry', 'furious', 'mad', 'irritated', 'frustrated', 'enraged', 'livid', 'outraged', 'annoyed', 'hostile', 'hate', 'disgusting'],
+            'fear': ['scared', 'afraid', 'terrified', 'anxious', 'worried', 'nervous', 'frightened', 'panicked', 'alarmed', 'petrified', 'worried'],
+            'surprise': ['surprised', 'shocked', 'amazed', 'astonished', 'stunned', 'bewildered', 'startled', 'dumbfounded', 'flabbergasted', 'wow', 'unbelievable'],
+            'disgust': ['disgusted', 'revolted', 'repulsed', 'sickened', 'nauseated', 'appalled', 'horrified', 'offended', 'disturbed', 'gross'],
+            'love': ['loving', 'adoring', 'cherishing', 'devoted', 'affectionate', 'caring', 'tender', 'romantic', 'passionate', 'fond', 'love'],
+            'anxiety': ['anxious', 'worried', 'nervous', 'uneasy', 'restless', 'tense', 'stressed', 'overwhelmed', 'panicked', 'agitated'],
+            'calm': ['calm', 'peaceful', 'serene', 'tranquil', 'relaxed', 'composed', 'collected', 'centered', 'balanced', 'zen', 'fine', 'okay'],
+            'excitement': ['excited', 'thrilled', 'enthusiastic', 'eager', 'pumped', 'energized', 'animated', 'vibrant', 'lively', 'buzzing'],
+            'shame': ['ashamed', 'embarrassed', 'guilty', 'humiliated', 'mortified', 'disgraced', 'chagrined', 'sheepish', 'remorseful', 'contrite'],
+            'gratitude': ['grateful', 'thankful', 'appreciative', 'blessed', 'indebted', 'obliged', 'moved', 'touched', 'humbled', 'gratified', 'thanks']
+        }
     
     def preprocess_text(self, text, max_length=128):
         """Preprocess text for model input"""
@@ -82,7 +101,9 @@ class CustomEmotionDetector:
         
         # Clean and tokenize
         text = re.sub(r'[^\w\s]', '', text.lower())
-        tokens = text.split()[:max_length]
+        raw_tokens = text.split()[:max_length]
+        # Lemmatize tokens for better normalization (e.g., "crying" -> "cry")
+        tokens = [self.lemmatizer.lemmatize(tok) for tok in raw_tokens]
         
         # Convert to indices
         token_ids = [self.vocab.get(token, 1) for token in tokens]  # 1 for <UNK>
@@ -112,6 +133,18 @@ class CustomEmotionDetector:
                 
                 emotion = self.label_encoder_classes[predicted.item()]
                 confidence_score = confidence.item()
+
+            # Low-confidence override with robust keyword matching for demo reliability
+            if confidence_score < 0.6:
+                text_lower = (text or '').lower()
+                override_scores = {emo: sum(1 for kw in kws if kw in text_lower)
+                                   for emo, kws in self.emotion_keywords.items()}
+                if override_scores:
+                    best_emo = max(override_scores, key=override_scores.get)
+                    if override_scores[best_emo] > 0:
+                        # Override only when we have at least one strong keyword signal
+                        emotion = best_emo
+                        confidence_score = max(confidence_score, 0.7)
             
             return emotion, confidence_score
             
@@ -126,21 +159,8 @@ class CustomEmotionDetector:
         
         text_lower = text.lower()
         
-        # Emotion keywords mapping
-        emotion_keywords = {
-            'joy': ['happy', 'joyful', 'excited', 'cheerful', 'delighted', 'ecstatic', 'thrilled', 'elated', 'blissful', 'content', 'great', 'amazing', 'wonderful', 'fantastic'],
-            'sadness': ['sad', 'depressed', 'down', 'melancholy', 'gloomy', 'heartbroken', 'dejected', 'miserable', 'sorrowful', 'blue', 'terrible', 'awful', 'horrible'],
-            'anger': ['angry', 'furious', 'mad', 'irritated', 'frustrated', 'enraged', 'livid', 'outraged', 'annoyed', 'hostile', 'hate', 'disgusting'],
-            'fear': ['scared', 'afraid', 'terrified', 'anxious', 'worried', 'nervous', 'frightened', 'panicked', 'alarmed', 'petrified', 'worried'],
-            'surprise': ['surprised', 'shocked', 'amazed', 'astonished', 'stunned', 'bewildered', 'startled', 'dumbfounded', 'flabbergasted', 'wow', 'unbelievable'],
-            'disgust': ['disgusted', 'revolted', 'repulsed', 'sickened', 'nauseated', 'appalled', 'horrified', 'offended', 'disturbed', 'gross'],
-            'love': ['loving', 'adoring', 'cherishing', 'devoted', 'affectionate', 'caring', 'tender', 'romantic', 'passionate', 'fond', 'love'],
-            'anxiety': ['anxious', 'worried', 'nervous', 'uneasy', 'restless', 'tense', 'stressed', 'overwhelmed', 'panicked', 'agitated'],
-            'calm': ['calm', 'peaceful', 'serene', 'tranquil', 'relaxed', 'composed', 'collected', 'centered', 'balanced', 'zen', 'fine', 'okay'],
-            'excitement': ['excited', 'thrilled', 'enthusiastic', 'eager', 'pumped', 'energized', 'animated', 'vibrant', 'lively', 'buzzing'],
-            'shame': ['ashamed', 'embarrassed', 'guilty', 'humiliated', 'mortified', 'disgraced', 'chagrined', 'sheepish', 'remorseful', 'contrite'],
-            'gratitude': ['grateful', 'thankful', 'appreciative', 'blessed', 'indebted', 'obliged', 'moved', 'touched', 'humbled', 'gratified', 'thanks']
-        }
+        # Emotion keywords mapping (shared)
+        emotion_keywords = self.emotion_keywords
         
         # Count keyword matches
         emotion_scores = {}

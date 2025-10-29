@@ -46,6 +46,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 nltk.download('punkt', quiet=True)
+# Ensure required NLTK resources for lemmatization
+try:
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4', quiet=True)
+except Exception:
+    pass
 
 # Initialize custom models
 @st.cache_resource
